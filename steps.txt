@@ -21,3 +21,48 @@ steps takes for this project:
 
 +++ 
 - client side page caching based on client system specs
+- spa/trad switch to be server side, add or remove code components based on toggle, optimize serving modes as well with code switches
+
+- Client-side enhancements:
+	Implement a state management solution (similar to Redux or MobX)
+	Add client-side routing with support for nested routes
+	Create a component system for reusable UI elements
+
+- Code splitting and lazy loading:
+	Implement dynamic imports for JavaScript modules
+	Create a system for lazy-loading page components
+
+- Server-side rendering (SSR):
+	Implement initial SSR for faster first contentful paint
+	Add support for SSR of dynamic routes
+
+- API development features:
+	Create a robust routing system with support for RESTful and GraphQL APIs
+	Implement middleware support for request/response processing
+	Add built-in support for database ORM (like GORM)
+
+- Developer experience:
+	Implement hot module replacement for faster development
+	Create a CLI tool for scaffolding new projects and components
+	Add support for TypeScript on the client-side
+
+- Testing and debugging:
+	Implement a testing framework for both client and server
+	Add built-in support for logging and error tracking
+
+- Performance optimizations:
+	Implement automatic image optimization
+	Add support for service workers and Progressive Web App (PWA) features
+
+- Security enhancements:
+	Implement CSRF protection
+	Add built-in rate limiting
+	Provide easy-to-use authentication and authorization modules
+
+- Internationalization (i18n) and localization (l10n):
+	Add support for multi-language content
+	Implement locale-based formatting for dates, numbers, etc.
+
+- Documentation and examples:
+	Create comprehensive documentation
+	Develop a set of example projects showcasing various use cases 
