@@ -1,0 +1,23 @@
+steps takes for this project:
+
+1. installed go
+
+2. some more installs:
+	- go get github.com/tdewolff/minify/v2
+	- go get github.com/tdewolff/minify/v2/css
+	- go get github.com/tdewolff/minify/v2/js
+	- go get github.com/tdewolff/minify/v2/html
+	- go get github.com/fsnotify/fsnotify
+	- go get github.com/evanw/esbuild
+
+3. commands:
+	start server = go run main.go 
+		- '-prod' for production mode
+
+	build assets = go run build.go
+		- '-watch' for file watcher to build assets on change
+		- '-concurrency x' to change parallel building to no X
+		- use .buildignore file to ignore patters and files in build process
+
++++ 
+- client side page caching based on client system specs
