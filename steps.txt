@@ -13,6 +13,7 @@ steps takes for this project:
 3. commands:
 	start server = go run main.go 
 		- '-prod' for production mode
+		- '-spa' for SPA mode
 
 	build assets = go run build.go
 		- '-watch' for file watcher to build assets on change
@@ -21,7 +22,9 @@ steps takes for this project:
 
 +++ 
 - client side page caching based on client system specs
-- spa/trad switch to be server side, add or remove code components based on toggle, optimize serving modes as well with code switches
+- when building remove any cache corresponding to files that are built
+- url aliases for folder and url name differentialtion
+- client side background thread asset loading
 
 - Client-side enhancements:
 	Implement a state management solution (similar to Redux or MobX)
@@ -66,3 +69,23 @@ steps takes for this project:
 - Documentation and examples:
 	Create comprehensive documentation
 	Develop a set of example projects showcasing various use cases 
+
+
+- Asynchronous file reading:
+For large files or when serving multiple requests simultaneously, we could implement asynchronous file reading. This would allow the server to handle other requests while waiting for file I/O operations to complete.
+- Improved template parsing:
+The current template system parses templates on each request in development mode. We could implement a more sophisticated template parsing system that watches for file changes and only re-parses templates when necessary, even in development mode.
+- Request middleware:
+Implementing a middleware system would allow for more flexible request processing, such as logging, authentication, or custom headers. This could be especially useful for API endpoints.
+- Enhanced SPA support:
+We could expand the SPA support by implementing features like client-side routing helpers, state management integration, or server-side rendering for initial SPA loads to improve SEO and initial load times.
+- Configuration management:
+Instead of using command-line flags for configuration, we could implement a more robust configuration system using environment variables or configuration files. This would make it easier to manage different environments (development, staging, production) and allow for more granular control over the framework's behavior.
+- Improved error handling and logging:
+Implementing a centralized error handling and logging system would make it easier to debug issues and monitor the application's health in production.
+- Performance profiling:
+Adding built-in performance profiling tools would help identify bottlenecks and optimize the framework's performance over time.
+- Testing suite:
+Developing a comprehensive testing suite, including unit tests and integration tests, would ensure the framework's reliability and make it easier to contribute to the project.
+- Documentation and examples:
+Creating detailed documentation and example applications would help developers understand and use the framework effectively.

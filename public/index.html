@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Title</title>
+    <title>WebSPA</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <style>{{.Style}}</style>
 </head>
 <body>
     <nav>
-        <a href="/" onclick="route()">Home</a>
-        <a href="/about" onclick="route()">About</a>
-        <a href="/contact" onclick="route()">Contact</a>
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
     </nav>
-    <button onclick="toggleSPA()">Toggle SPA Mode</button>
-    <div id="app">
-        {{.Content}}
-    </div>
-    <style>{{.Style}}</style>
+    <div id="app">{{.Content}}</div>
+    <script>
+        window.isSPAMode = {{.IsSPAMode}};
+    </script>
     <script>{{.Script}}</script>
     <script src="/static/app.js"></script>
 </body>
