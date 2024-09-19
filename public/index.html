@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSPA</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <script>
+        window.isSPAMode = {{.IsSPAMode}};
+    </script>
+    <script type="module" src="/static/app.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="/static/style.css">
     <style>{{.Style}}</style>
 </head>
 <body>
@@ -14,10 +19,6 @@
         <a href="/contact">Contact</a>
     </nav>
     <div id="app">{{.Content}}</div>
-    <script>
-        window.isSPAMode = {{.IsSPAMode}};
-    </script>
     <script>{{.Script}}</script>
-    <script src="/static/app.js"></script>
 </body>
 </html>

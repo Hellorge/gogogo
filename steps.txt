@@ -14,22 +14,45 @@ steps takes for this project:
 	start server = go run main.go 
 		- '-prod' for production mode
 		- '-spa' for SPA mode
+		- '-metrics' for logging metrics data
 
 	build assets = go run build.go
 		- '-watch' for file watcher to build assets on change
 		- '-concurrency x' to change parallel building to no X
 		- use .buildignore file to ignore patters and files in build process
 
+	check metrics = go run metrics.go
+
+4. features:
+	- SPA and Traditional modes
+	- Cache aware request coalescing
+	- Production and Development modes
+	- Pre compile, minified file serving for production
+	- Dynamic cache size based on available memory
+	- Template caching
+	- Static file serving
+	- Thread safety in caching
+	- Variable cache life policy
+	- Benchmarks for native metrics overhead, test cases for high loads, high traffic, sustained high load, burst traffic
+	- 
+
 +++ 
+- spa mode use view transition api, with reduce animation flag to disable it
+- handle multiple sites using '/server/{sitename}/home'
 - client side page caching based on client system specs
 - when building remove any cache corresponding to files that are built
 - url aliases for folder and url name differentialtion
 - client side background thread asset loading
+- nested templates, partial templates
+
+- implement a testing framework for both client and server
+- add built-in support for logging and error tracking
+- implement automatic image optimization
+- add support for service workers and Progressive Web App (PWA) features
 
 - Client-side enhancements:
 	Implement a state management solution (similar to Redux or MobX)
 	Add client-side routing with support for nested routes
-	Create a component system for reusable UI elements
 
 - Code splitting and lazy loading:
 	Implement dynamic imports for JavaScript modules
@@ -48,14 +71,6 @@ steps takes for this project:
 	Implement hot module replacement for faster development
 	Create a CLI tool for scaffolding new projects and components
 	Add support for TypeScript on the client-side
-
-- Testing and debugging:
-	Implement a testing framework for both client and server
-	Add built-in support for logging and error tracking
-
-- Performance optimizations:
-	Implement automatic image optimization
-	Add support for service workers and Progressive Web App (PWA) features
 
 - Security enhancements:
 	Implement CSRF protection
@@ -89,3 +104,112 @@ Adding built-in performance profiling tools would help identify bottlenecks and 
 Developing a comprehensive testing suite, including unit tests and integration tests, would ensure the framework's reliability and make it easier to contribute to the project.
 - Documentation and examples:
 Creating detailed documentation and example applications would help developers understand and use the framework effectively.
+
+
+---
+1. Pre-loading content:
+We could pre-load frequently accessed content into memory at startup, reducing disk I/O during requests.
+
+
+
+```go
+var preloadedContent = make(map[string]PageContent)
+
+func preloadContent() {
+    commonPaths := []string{"home", "about", "contact"} // Add your most common paths
+    for _, path := range commonPaths {
+        content, err := loadContent(path)
+        if err == nil {
+            preloadedContent[path] = content
+        }
+    }
+}
+
+func main() {
+    // ... existing setup ...
+    if *isProduction {
+        // ... existing production setup ...
+        preloadContent()
+    }
+    // ... rest of main function ...
+}
+
+func loadContent(path string) (PageContent, error) {
+    if *isProduction {
+        if content, ok := preloadedContent[path]; ok {
+            return content, nil
+        }
+    }
+    // ... existing loadContent logic ...
+}
+
+```
+
+2. Implement HTTP/2 Server Push:
+For known resource combinations, we can use HTTP/2 Server Push to send critical assets before the client requests them.
+
+3. Optimize template parsing:
+Parse templates once at startup and store them in memory.
+
+
+
+```go
+var (
+    templates     = make(map[string]*template.Template)
+    templateMutex sync.RWMutex
+)
+
+func loadAllTemplates() error {
+    templateFiles, err := filepath.Glob(filepath.Join(templateDir, "*.html"))
+    if err != nil {
+        return err
+    }
+
+    for _, file := range templateFiles {
+        name := filepath.Base(file)
+        tmpl, err := template.ParseFiles(file)
+        if err != nil {
+            return err
+        }
+        templates[name] = tmpl
+    }
+    return nil
+}
+
+func main() {
+    // ... existing setup ...
+    if err := loadAllTemplates(); err != nil {
+        log.Fatalf("Failed to load templates: %v", err)
+    }
+    // ... rest of main function ...
+}
+
+func loadTemplate(name string) (*template.Template, error) {
+    templateMutex.RLock()
+    tmpl, ok := templates[name]
+    templateMutex.RUnlock()
+    if !ok {
+        return nil, fmt.Errorf("template not found: %s", name)
+    }
+    return tmpl, nil
+}
+
+```
+
+4. Implement response compression:
+Use gzip compression for responses to reduce bandwidth and improve loading times.
+
+5. Use a more efficient router:
+Consider using a high-performance router like `httprouter` or `fasthttp` for faster request routing.
+
+6. Implement aggressive caching headers:
+Set appropriate caching headers to allow client-side caching of static assets.
+
+7. Use a CDN for static assets:
+Offload static asset serving to a Content Delivery Network to reduce server load and improve global performance.
+
+8. Implement connection pooling for database connections:
+If you're using a database, ensure you're using connection pooling to reduce the overhead of creating new connections.
+
+9. Profile and optimize hot code paths:
+Use Go's built-in profiling tools to identify and optimize the most frequently executed code paths.
