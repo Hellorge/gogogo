@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Dashboard</title>
+		<link rel="stylesheet" href="styles.css" />
+		<style>
+			:root {
+				--padding-xs: 0.5em;
+				--padding-sm: 1em;
+				--padding-md: 2em;
+				--border-radius-md: 2em;
+				--border-radius-sm: 1em;
+				--border-radius-xs: 0.5em;
+				--sidebar-bg: #636d79;
+				--sidebar-tc: #fff;
+				--main-bg: #f2f2f2;
+				--card-bg: #fff;
+			}
+			body {
+				display: flex;
+				height: 100dvh;
+				width: 100dvw;
+				margin: 0;
+				background-color: var(--sidebar-bg);
+			}
+			.sidebar {
+				--sidebar-anim: 0.1s ease-out;
+				--icon-sb: 20px;
+				color: var(--sidebar-tc);
+				background-color: var(--sidebar-bg);
+				padding: var(--padding-sm) 0;
+				transition: var(--sidebar-anim);
+
+				ul {
+					padding: var(--padding-xs);
+				}
+
+				li {
+					white-space: nowrap;
+					width: var(--icon-sb);
+					transition: inherit;
+					overflow: hidden;
+					text-overflow: ellipsis;
+				}
+
+				svg {
+					height: var(--icon-sb);
+					width: var(--icon-sb);
+				}
+			}
+
+			.sidebar:hover {
+				--icon-sb: 20px;
+				padding: var(--padding-sm);
+
+				li {
+					width: auto;
+				}
+			}
+
+			.main-content {
+				background-color: var(--main-bg);
+				flex-grow: 1;
+				padding: var(--padding-md);
+				border-radius: var(--border-radius-md) 0 0
+					var(--border-radius-md);
+			}
+
+			.card {
+				background-color: var(--card-bg);
+				border-radius: var(--border-radius-xs);
+				box-shadow: 0 0 15px -15px #000;
+				padding: 1em;
+				width: fit-content;
+				margin-bottom: 1em;
+			}
+
+			.requests-table {
+				width: 100%;
+				border-collapse: collapse;
+
+				th,
+				td {
+					/* border: 1px solid; */
+					padding: 5px 10px;
+				}
+			}
+
+			li {
+				display: block;
+			}
+
+			.icon-md {
+				height: 20px;
+				width: 20px;
+				fill: currentColor;
+				stroke-linecap: round;
+				stroke-linejoin: round;
+				vertical-align: bottom;
+			}
+
+			.flex-box {
+				display: flex;
+			}
+
+			.graph-container {
+				width: 300px;
+				height: 100%;
+				display: flex;
+				/* flex-direction: row-reverse; */
+				overflow: hidden;
+				justify-content: space-evenly;
+				align-items: center;
+
+				.col {
+					height: 100%;
+					display: flex;
+					justify-content: center;
+					flex-direction: column;
+				}
+
+				.dot {
+					background-color: red;
+					margin-bottom: 4px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="sidebar">
+			<nav>
+				<ul>
+					<li>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="icon-md"
+							viewBox="0 0 512 512"
+						>
+							<path
+								d="M80 212v236a16 16 0 0016 16h96V328a24 24 0 0124-24h80a24 24 0 0124 24v136h96a16 16 0 0016-16V212"
+							/>
+							<path
+								d="M480 256L266.89 52c-5-5.28-16.69-5.34-21.78 0L32 256M400 179V64h-48v69"
+							/>
+						</svg>
+						<a href="#" class="sidebar-label">Home</a>
+					</li>
+					<li>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="icon-md"
+							viewBox="0 0 512 512"
+						>
+							<path
+								d="M32 32v432a16 16 0 0016 16h432"
+								fill="none"
+								stroke="currentColor"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="32"
+							/>
+							<rect
+								x="96"
+								y="224"
+								width="80"
+								height="192"
+								rx="20"
+								ry="20"
+							/>
+							<rect
+								x="240"
+								y="176"
+								width="80"
+								height="240"
+								rx="20"
+								ry="20"
+							/>
+							<rect
+								x="383.64"
+								y="112"
+								width="80"
+								height="304"
+								rx="20"
+								ry="20"
+							/>
+						</svg>
+						<a href="#" class="sidebar-label">Metrics</a>
+					</li>
+				</ul>
+			</nav>
+		</div>
+
+		<div class="main-content">
+			<header>
+				<h1>Dahshbord</h1>
+			</header>
+			<div class="overview">
+				<div class="flex-box">
+					<div class="card">
+						<b>System</b>
+						<br />
+						<svg
+							viewBox="0 0 300 200"
+							height="200px"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<defs>
+								<pattern
+									id="img-dotted-pattern"
+									viewBox="0 0 1 1"
+									patternUnits="userSpaceOnUse"
+									x="0"
+									y="0"
+									width="10"
+									height="10"
+								>
+									<circle
+										cx="0.5"
+										cy="0.5"
+										fill="white"
+										r="0.15"
+									></circle>
+								</pattern>
+
+								<mask id="img-dotted-mask">
+									<rect
+										width="300"
+										height="200"
+										fill="url(#img-dotted-pattern)"
+									/>
+								</mask>
+
+								<linearGradient
+									id="data-gradient"
+									x1="0%"
+									y1="0%"
+									x2="100%"
+									y2="0%"
+								>
+									<stop
+										offset="0%"
+										style="
+											stop-color: #3498db;
+											stop-opacity: 1;
+										"
+									/>
+									<stop
+										offset="50%"
+										style="
+											stop-color: #e74c3c;
+											stop-opacity: 1;
+										"
+									/>
+									<stop
+										offset="100%"
+										style="
+											stop-color: #2ecc71;
+											stop-opacity: 1;
+										"
+									/>
+								</linearGradient>
+							</defs>
+
+							<rect
+								width="300"
+								height="200"
+								fill="#eee"
+								mask="url(#img-dotted-mask)"
+							/>
+							<path
+								d="M0 200 L0 150 Q75 50 150 100 T300 50 L300 200 Z"
+								fill="url(#data-gradient)"
+								mask="url(#img-dotted-mask)"
+							>
+								<animate
+									attributeName="d"
+									values="M0 200 L0 150 Q75 50 150 100 T300 50 L300 200 Z;
+										M0 200 L0 100 Q75 150 150 50 T300 100 L300 200 Z;
+										M0 200 L0 150 Q75 50 150 100 T300 50 L300 200 Z"
+									dur="5s"
+									repeatCount="indefinite"
+								/>
+							</path>
+						</svg>
+					</div>
+
+					<div class="card">
+						<div class="graph-container" id="graph">
+							<div class="col col-1">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-2">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-3">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-4">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-5">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-6">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-7">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-8">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-9">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-10">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-11">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-12">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-13">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-14">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-15">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-16">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-17">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-18">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-19">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-20">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-21">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-22">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-23">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-24">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-25">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-26">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-27">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-28">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-29">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+							<div class="col col-30">
+								<div
+									class="dot"
+									style="height: 5px; width: 5px"
+								></div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<table class="card requests-table">
+					<thead>
+						<tr>
+							<th>Route</th>
+							<th>Response Time</th>
+							<th>Memory</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>/home</td>
+							<td>0s</td>
+							<td>0</td>
+						</tr>
+						<tr>
+							<td>/home</td>
+							<td>0s</td>
+							<td>0</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<script>
+			const graph = document.getElementById("graph");
+			const graphWidth = graph.clientWidth;
+			const graphHeight = graph.clientHeight;
+			const columnWidth = 10;
+			const maxColumns = Math.ceil(graphWidth / columnWidth);
+			const dotSize = columnWidth / 2;
+			const dotsPerColumn = graphHeight / dotSize / 2;
+			let data = new Array(maxColumns).fill(0);
+
+			function addDataPoint(value) {
+				const normalizedValue = Math.min(Math.max(value, 0), 1);
+				data.push(normalizedValue);
+				if (data.length > maxColumns) {
+					data = data.slice(-maxColumns);
+				}
+				updateGraph();
+			}
+
+			function updateGraph() {
+				let columns = "";
+				data.forEach((value, index) => {
+					columns += `<div class="col col-${index + 1}">
+						${`<div class="dot" style="height: ${dotSize}px; width: ${dotSize}px"></div>`.repeat(
+							parseInt(dotsPerColumn * value),
+						)}
+					</div>`;
+				});
+				graph.innerHTML = columns;
+			}
+
+			// // Example usage: add a new data point every second
+			setInterval(() => {
+				const randomValue = Math.random();
+				addDataPoint(randomValue);
+			}, 1000);
+		</script>
+	</body>
+</html>

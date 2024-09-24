@@ -11,7 +11,7 @@ steps takes for this project:
 	- go get github.com/evanw/esbuild
 
 3. commands:
-	start server = go run main.go 
+	start server = go run main.go
 		- '-prod' for production mode
 		- '-spa' for SPA mode
 		- '-metrics' for logging metrics data
@@ -34,9 +34,10 @@ steps takes for this project:
 	- Thread safety in caching
 	- Variable cache life policy
 	- Benchmarks for native metrics overhead, test cases for high loads, high traffic, sustained high load, burst traffic
-	- 
+	-
 
-+++ 
++++
+- in server folder add config file for template selection, header imports, and seo
 - spa mode use view transition api, with reduce animation flag to disable it
 - handle multiple sites using '/server/{sitename}/home'
 - client side page caching based on client system specs
@@ -44,6 +45,9 @@ steps takes for this project:
 - url aliases for folder and url name differentialtion
 - client side background thread asset loading
 - nested templates, partial templates
+- LFU, Predictive-Gradual cache warming
+- Single-source Distributed serving capabilities
+- Js MayNeed dynamic module leading system
 
 - implement a testing framework for both client and server
 - add built-in support for logging and error tracking
@@ -83,7 +87,7 @@ steps takes for this project:
 
 - Documentation and examples:
 	Create comprehensive documentation
-	Develop a set of example projects showcasing various use cases 
+	Develop a set of example projects showcasing various use cases
 
 
 - Asynchronous file reading:
