@@ -1,4 +1,4 @@
-package metrics
+package modules
 
 import (
 	"crypto/subtle"
@@ -36,7 +36,7 @@ type ServerMetrics struct {
 	ActiveGoroutines int32
 }
 
-func Init() error {
+func NewMetrics() error {
 	var err error
 	dashboardTemplate, err = template.ParseFiles("metrics/dashboard.html")
 	if err != nil {
@@ -89,8 +89,8 @@ func updateMetrics(url string, responseTime time.Duration, memoryUsed uint64, st
 	atomic.StoreInt32(&serverMetrics.ActiveGoroutines, int32(runtime.NumGoroutine()))
 }
 
-func Middleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func MetricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
 		rw := &responseWriter{ResponseWriter: w}
@@ -102,7 +102,7 @@ func Middleware(next http.HandlerFunc) http.HandlerFunc {
 		runtime.ReadMemStats(&m)
 
 		updateMetrics(r.URL.Path, duration, m.Alloc, rw.statusCode)
-	}
+	})
 }
 
 type responseWriter struct {

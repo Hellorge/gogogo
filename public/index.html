@@ -1,24 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSPA</title>
-    <script>
-        window.isSPAMode = {{.IsSPAMode}};
-    </script>
-    <script type="module" src="/static/app.js"></script>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>GoGoGo</title>
+		<script>
+			window.isSPAMode = {{.IsSPAMode}};
+		</script>
+		<script type="module" src="/static/app.js"></script>
 
-    <link rel="stylesheet" type="text/css" href="/static/style.css">
-    <style>{{.Style}}</style>
-</head>
-<body>
-    <nav>
-        <a href="/">Home</a>
-        <a href="/about">About</a>
-        <a href="/contact">Contact</a>
-    </nav>
-    <div id="app">{{.Content}}</div>
-    <script>{{.Script}}</script>
-</body>
+		<link rel="stylesheet" type="text/css" href="/static/style.css" />
+		<style>
+			{{.Style}}
+		</style>
+	</head>
+	<body>
+		<nav>
+			<a href="/">Home</a>
+			<a href="/about">About</a>
+			<a href="/contact">Contact</a>
+		</nav>
+		<div id="app">{{.Content}}</div>
+		<script>
+			{{.Script}}
+		</script>
+	</body>
 </html>

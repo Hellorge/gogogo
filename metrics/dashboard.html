@@ -16,14 +16,26 @@
 				--sidebar-bg: #636d79;
 				--sidebar-tc: #fff;
 				--main-bg: #f2f2f2;
+				--main-tc: #000;
 				--card-bg: #fff;
 			}
+
+			/* dark */
+			:root {
+				--sidebar-bg: #121212;
+				--sidebar-tc: #fff;
+				--main-bg: #262626;
+				--main-tc: #fff;
+				--card-bg: #202020;
+			}
+
 			body {
 				display: flex;
 				height: 100dvh;
 				width: 100dvw;
 				margin: 0;
 				background-color: var(--sidebar-bg);
+				color: var(--main-tc);
 			}
 			.sidebar {
 				--sidebar-anim: 0.1s ease-out;
@@ -66,15 +78,17 @@
 				padding: var(--padding-md);
 				border-radius: var(--border-radius-md) 0 0
 					var(--border-radius-md);
+				box-shadow: 0 0 15px -5px #000;
 			}
 
 			.card {
 				background-color: var(--card-bg);
 				border-radius: var(--border-radius-xs);
-				box-shadow: 0 0 15px -15px #000;
+				box-shadow: 0 0 10px -10px #000;
 				padding: 1em;
 				width: fit-content;
 				margin-bottom: 1em;
+				margin-right: 1em;
 			}
 
 			.requests-table {
@@ -109,9 +123,8 @@
 				width: 300px;
 				height: 100%;
 				display: flex;
-				/* flex-direction: row-reverse; */
+				flex-direction: row-reverse;
 				overflow: hidden;
-				justify-content: space-evenly;
 				align-items: center;
 
 				.col {
@@ -119,10 +132,19 @@
 					display: flex;
 					justify-content: center;
 					flex-direction: column;
+					margin-left: 4px;
+				}
+
+				.col:nth-child(2n) {
+					margin-left: 2px;
 				}
 
 				.dot {
 					background-color: red;
+					margin-bottom: 3px;
+				}
+
+				.dot:nth-child(4n) {
 					margin-bottom: 4px;
 				}
 			}
@@ -500,8 +522,8 @@
 			const graphHeight = graph.clientHeight;
 			const columnWidth = 10;
 			const maxColumns = Math.ceil(graphWidth / columnWidth);
-			const dotSize = columnWidth / 2;
-			const dotsPerColumn = graphHeight / dotSize / 2;
+			const dotSize = columnWidth / 3;
+			const dotsPerColumn = graphHeight / dotSize / 4;
 			let data = new Array(maxColumns).fill(0);
 
 			function addDataPoint(value) {
@@ -515,11 +537,15 @@
 
 			function updateGraph() {
 				let columns = "";
+				let dotHTML = `<div class="dot" style="height: ${dotSize}px; width: ${dotSize}px"></div>`;
 				data.forEach((value, index) => {
 					columns += `<div class="col col-${index + 1}">
-						${`<div class="dot" style="height: ${dotSize}px; width: ${dotSize}px"></div>`.repeat(
-							parseInt(dotsPerColumn * value),
-						)}
+						<div>
+							${dotHTML.repeat(parseInt(dotsPerColumn * value))}
+						</div>
+						<div>
+							${dotHTML.repeat(parseInt(dotsPerColumn * value))}
+						</div>
 					</div>`;
 				});
 				graph.innerHTML = columns;

@@ -39,3 +39,36 @@ Adding support for WebSockets or server-sent events
 Developing a testing framework specific to the web framework
 
 The framework aims to balance performance, especially in production environments, with developer-friendly features for rapid development. There's still work to be done to make it a comprehensive, production-ready web framework.
+
+
+Client Request
+         |
+         v
+   +-------------+
+   |  fnrProd    |
+   +-------------+
+         |
+         v
+   +-------------+
+   |  Coalescer  |
+   +-------------+
+         |
+         v
+   +-------------+
+   |    Cache    |
+   +-------------+
+         |
+    Cache Miss?
+         |
+         v
+   +-------------+
+   | Trie Router |
+   +-------------+
+         |
+         v
+   +-------------+
+   | Disk (dist) |
+   +-------------+
+         |
+         v
+ Update Cache & Respond

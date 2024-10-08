@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro-Futuristic Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+        :root {
+            --primary-color: #FF6B00;
+            --secondary-color: #1A1A1A;
+            --bg-color: #F5F5F5;
+            --text-color: #1A1A1A;
+            --accent-color: #FFD700;
+            --graph-color: #2ECC71;
+        }
+
+        body {
+            font-family: 'Space Mono', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 200px;
+            background-color: var(--secondary-color);
+            padding: 20px;
+        }
+
+        .sidebar-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            color: var(--bg-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .sidebar-label:hover {
+            color: var(--primary-color);
+        }
+
+        .icon-md {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            fill: currentColor;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            color: var(--primary-color);
+        }
+
+        .overview {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background-color: var(--bg-color);
+            border: 2px solid var(--secondary-color);
+            padding: 20px;
+            width: 45%;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .graph-container {
+            position: relative;
+            height: 200px;
+            margin-top: 20px;
+            border: 1px solid var(--secondary-color);
+            overflow: hidden;
+        }
+
+        .graph-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0;
+            background-color: var(--graph-color);
+            transition: height 0.5s ease;
+        }
+
+        .graph-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            transition: all 0.5s ease;
+        }
+
+        .graph-label {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            font-size: 0.8em;
+            color: var(--text-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 40px;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--secondary-color);
+        }
+
+        th {
+            background-color: var(--secondary-color);
+            color: var(--bg-color);
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <a href="#" class="sidebar-label">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon-md" viewbox="0 0 512 512">
+                <path d="M80 212v236a16 16 0 0016 16h96V328a24 24 0 0124-24h80a24 24 0 0124 24v136h96a16 16 0 0016-16V212"></path>
+                <path d="M480 256L266.89 52c-5-5.28-16.69-5.34-21.78 0L32 256M400 179V64h-48v69"></path>
+            </svg>
+            Home
+        </a>
+        <a href="#" class="sidebar-label">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon-md" viewbox="0 0 512 512">
+                <path d="M32 32v432a16 16 0 0016 16h432" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"></path>
+                <rect x="96" y="224" width="80" height="192" rx="20" ry="20"></rect>
+                <rect x="240" y="176" width="80" height="240" rx="20" ry="20"></rect>
+                <rect x="383.64" y="112" width="80" height="304" rx="20" ry="20"></rect>
+            </svg>
+            Metrics
+        </a>
+    </div>
+
+    <div class="main-content">
+        <h1>Dashboard</h1>
+
+        <div class="overview">
+            <div class="card">
+                <strong>System Load</strong>
+                <div id="system-graph" class="graph-container">
+                    <div class="graph-line"></div>
+                    <div class="graph-dot"></div>
+                    <div class="graph-label">0%</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <strong>Memory Usage</strong>
+                <div id="memory-graph" class="graph-container">
+                    <div class="graph-line"></div>
+                    <div class="graph-dot"></div>
+                    <div class="graph-label">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Route</th>
+                    <th>Response Time</th>
+                    <th>Memory</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>/home</td>
+                    <td>0s</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td>/home</td>
+                    <td>0s</td>
+                    <td>0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function animateGraph(graphId) {
+            const graph = document.getElementById(graphId);
+            const line = graph.querySelector('.graph-line');
+            const dot = graph.querySelector('.graph-dot');
+            const label = graph.querySelector('.graph-label');
+
+            setInterval(() => {
+                const height = Math.random() * 100;
+                line.style.height = `${height}%`;
+                dot.style.bottom = `${height}%`;
+                dot.style.left = `${Math.random() * 100}%`;
+                label.textContent = `${Math.round(height)}%`;
+            }, 2000);
+        }
+
+        animateGraph('system-graph');
+        animateGraph('memory-graph');
+    </script>
+</body>
+</html>

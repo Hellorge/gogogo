@@ -37,6 +37,7 @@ steps takes for this project:
 	-
 
 +++
+- build file info make it router savefile, also we can add aliases when building the files with use of config file in next point
 - in server folder add config file for template selection, header imports, and seo
 - spa mode use view transition api, with reduce animation flag to disable it
 - handle multiple sites using '/server/{sitename}/home'
