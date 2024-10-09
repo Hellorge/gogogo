@@ -80,7 +80,7 @@ func NewServer(config ServerConfig) (http.Handler, error) {
 		findAndReadFile = fnrProd
 
 		var err error
-		buildRouter, err = modules.NewRouter("build_file_info.json")
+		buildRouter, err = modules.NewRouter("build_trie.bin")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create build router: %w", err)
 		}
@@ -114,6 +114,74 @@ func NewServer(config ServerConfig) (http.Handler, error) {
 	}
 
 	return mux, nil
+}
+
+func fnrProd(path, filename string) ([]byte, error) {
+	cacheKey := filepath.Join(path, filename)
+	return reqCoalescer.Do(cacheKey, func() ([]byte, error) {
+		// Try to get from cache first
+		if value, ok := advancedCache.Get(cacheKey); ok {
+			return value, nil
+		}
+
+		// If not in cache, try to get from build router
+		filePath, ok := buildRouter.Route(cacheKey)
+		if !ok {
+			return nil, fmt.Errorf("file not found: %s", cacheKey)
+		}
+
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
+		}
+
+		// Cache the content we just read
+		advancedCache.Set(cacheKey, content, time.Now().Add(24*time.Hour))
+
+		return content, nil
+	})
+}
+
+func fnrDev(path, filename string) ([]byte, error) {
+	fullPath := filepath.Join(baseDir, path, filename)
+	return os.ReadFile(fullPath)
+}
+
+func loadContent(path string) (PageContent, error) {
+	content, err := findAndReadFile(path, "content.html")
+	if err != nil {
+		return PageContent{}, fmt.Errorf("content file error: %w", err)
+	}
+
+	style, _ := findAndReadFile(path, "style.css")
+	script, _ := findAndReadFile(path, "script.js")
+
+	return PageContent{
+		Content:   template.HTML(content),
+		Style:     template.CSS(style),
+		Script:    template.JS(script),
+		IsSPAMode: *isSPAMode,
+	}, nil
+}
+
+func loadTemplate(name string) (*template.Template, error) {
+	templateMutex.RLock()
+	tmpl, ok := templates[name]
+	templateMutex.RUnlock()
+	if ok {
+		return tmpl, nil
+	}
+
+	templateMutex.Lock()
+	defer templateMutex.Unlock()
+
+	filePath := filepath.Join(templateDir, name)
+	tmpl, err := template.ParseFiles(filePath)
+	if err != nil {
+		return nil, err
+	}
+	templates[name] = tmpl
+	return tmpl, nil
 }
 
 func webHandler(w http.ResponseWriter, r *http.Request) {
@@ -155,72 +223,4 @@ func normalizePath(path string) string {
 		return "home"
 	}
 	return strings.TrimPrefix(path, "/")
-}
-
-func loadTemplate(name string) (*template.Template, error) {
-	templateMutex.RLock()
-	tmpl, ok := templates[name]
-	templateMutex.RUnlock()
-	if ok {
-		return tmpl, nil
-	}
-
-	templateMutex.Lock()
-	defer templateMutex.Unlock()
-
-	filePath := filepath.Join(templateDir, name)
-	tmpl, err := template.ParseFiles(filePath)
-	if err != nil {
-		return nil, err
-	}
-	templates[name] = tmpl
-	return tmpl, nil
-}
-
-func loadContent(path string) (PageContent, error) {
-	content, err := findAndReadFile(path, "content.html")
-	if err != nil {
-		return PageContent{}, fmt.Errorf("content file error: %w", err)
-	}
-
-	style, _ := findAndReadFile(path, "style.css")
-	script, _ := findAndReadFile(path, "script.js")
-
-	return PageContent{
-		Content:   template.HTML(content),
-		Style:     template.CSS(style),
-		Script:    template.JS(script),
-		IsSPAMode: *isSPAMode,
-	}, nil
-}
-
-func fnrDev(path, filename string) ([]byte, error) {
-	fullPath := filepath.Join(baseDir, path, filename)
-	return os.ReadFile(fullPath)
-}
-
-func fnrProd(path, filename string) ([]byte, error) {
-	cacheKey := filepath.Join(path, filename)
-	return reqCoalescer.Do(cacheKey, func() ([]byte, error) {
-		// Try to get from cache first
-		if value, ok := advancedCache.Get(cacheKey); ok {
-			return value, nil
-		}
-
-		// If not in cache, try to get from build router
-		filePath, ok := buildRouter.Route(cacheKey)
-		if !ok {
-			return nil, fmt.Errorf("file not found: %s", cacheKey)
-		}
-
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
-		}
-
-		// Cache the content we just read
-		advancedCache.Set(cacheKey, content, time.Now().Add(24*time.Hour))
-
-		return content, nil
-	})
 }
