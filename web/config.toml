@@ -1,0 +1,51 @@
+# Server configuration
+[server]
+port = 8080
+host = "localhost"
+production_mode = true
+spa_mode = true
+metrics_enabled = true
+caching_enabled = true
+coalescer_enabled = true
+
+# Cache settings
+[cache]
+max_size = 100000
+default_expiration = "24h"
+
+# Metrics settings
+[metrics]
+collection_interval = "1s"
+retention_period = "1h"
+
+# Logging
+[logging]
+level = "info"
+file = "server.log"
+
+# Directories
+[directories]
+web = "web"
+content = "content"
+static = "static"
+dist = "dist"
+meta = "meta"
+core = "core"
+templates = "templates"
+
+# URL prefixes
+[url_prefixes]
+spa = "/__spa__/"
+static = "/static/"
+core = "/core/"
+
+# Templates
+[templates]
+main = "core"
+
+# Build
+[build]
+ignore_file = ".buildignore"
+
+# File reading
+base_dir = ""

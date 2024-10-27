@@ -3,6 +3,7 @@ module gogogo
 go 1.23.0
 
 require (
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/evanw/esbuild v0.23.1 // indirect
@@ -16,6 +17,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/nsf/termbox-go v1.1.1 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/rivo/tview v0.0.0-20240818110301-fd649dbf1223 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tdewolff/minify/v2 v2.20.37 // indirect
@@ -23,7 +25,9 @@ require (
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
-	golang.org/x/term v0.17.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/term v0.25.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
