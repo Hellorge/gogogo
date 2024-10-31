@@ -50,7 +50,7 @@ core = "/core/"
 
 # Templates
 [templates]
-main = "core"
+main = "def"
 
 # Build
 [build]

@@ -58,23 +58,23 @@ func main() {
 		Router:  r,
 	})
 
-	templateEngine := templates.New(fm)
+	templateEngine := templates.New(fm, cfg.Directories.Templates)
 
 	// Get main template
-	mainTemplate, err := templateEngine.GetTemplate(filepath.Join(cfg.Templates.Main, "index.html"))
+	mainTemplate, err := templateEngine.GetTemplate(filepath.Join(cfg.Templates.Main))
 	if err != nil {
 		log.Fatalf("Failed to load main template: %v", err)
 	}
 
 	// Initialize all handlers
-	webHandler := handlers.NewWebHandler(fm, mainTemplate, cfg.Directories.Content)
+	webHandler := handlers.NewWebHandler(fm, mainTemplate, cfg.Directories.Content, cfg.Server.SPAMode)
 	staticHandler := handlers.NewStaticHandler(fm)
 	apiHandler := handlers.NewAPIHandler(fm, cfg.Directories.Content)
 
 	// SPA handler only if SPA mode enabled
 	var spaHandler http.Handler
 	if cfg.Server.SPAMode {
-		spaHandler = handlers.NewSPAHandler(fm, cfg.Directories.Content)
+		spaHandler = handlers.NewSPAHandler(fm, cfg.Directories.Content, cfg.Server.SPAMode)
 	}
 
 	srv := server.New(server.Handlers{

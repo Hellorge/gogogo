@@ -63,7 +63,6 @@ func New(handlers Handlers, cfg config.Config) *Server {
 
 	// Static files
 	mux.Handle("/static/", handlers.Static)
-	mux.Handle("/core/", handlers.Static)
 
 	// All other paths go to web handler
 	mux.Handle("/", handlers.Web)

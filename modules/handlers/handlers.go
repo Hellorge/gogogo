@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -39,12 +38,14 @@ type WebHandler struct {
 	template    *template.Template
 	contentPath string
 	bufferPool  sync.Pool
+	SPAMode     bool
 }
 
 type SPAHandler struct {
 	fm          *filemanager.FileManager
 	contentPath string
 	bufferPool  sync.Pool
+	SPAMode     bool
 }
 
 type StaticHandler struct {
@@ -67,11 +68,12 @@ type ContentLoader struct {
 	wg      sync.WaitGroup
 }
 
-func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, contentPath string) *WebHandler {
+func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, contentPath string, SPAMode bool) *WebHandler {
 	return &WebHandler{
 		fm:          fm,
 		template:    tmpl,
 		contentPath: contentPath,
+		SPAMode:     SPAMode,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
 				return &TemplateData{Meta: defaultMeta}
@@ -80,10 +82,11 @@ func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, content
 	}
 }
 
-func NewSPAHandler(fm *filemanager.FileManager, contentPath string) *SPAHandler {
+func NewSPAHandler(fm *filemanager.FileManager, contentPath string, SPAMode bool) *SPAHandler {
 	return &SPAHandler{
 		fm:          fm,
 		contentPath: contentPath,
+		SPAMode:     SPAMode,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, 4096)
@@ -159,7 +162,7 @@ func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	*data = TemplateData{
 		Content:   template.HTML(cl.content),
 		Meta:      defaultMeta,
-		IsSPAMode: true,
+		IsSPAMode: h.SPAMode,
 	}
 
 	if meta, err := metaparser.ParseMetaData(cl.meta); err == nil {
@@ -189,7 +192,6 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contentPath := filepath.Join(h.contentPath, path)
-	fmt.Println(contentPath)
 	cl := loadContent(h.fm, contentPath)
 	if cl.err != nil {
 		http.NotFound(w, r)
@@ -213,7 +215,7 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Content: string(cl.content),
 	}
 
-	resp.IsSPAMode = true
+	resp.IsSPAMode = h.SPAMode
 	if meta, err := metaparser.ParseMetaData(cl.meta); err == nil {
 		resp.Meta = meta
 	}

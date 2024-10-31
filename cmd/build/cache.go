@@ -3,10 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"gogogo/modules/router"
 	"os"
 	"sync"
-
-	"gogogo/modules/router"
 )
 
 type FileCache struct {

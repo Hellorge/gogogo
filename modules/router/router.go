@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"os"
 	"sync"
+	"time"
 )
 
 type Router struct {
@@ -12,7 +13,9 @@ type Router struct {
 }
 
 type FileInfo struct {
-	DistPath string
+	ModTime   time.Time `json:"ModTime"`
+	DistPath  string    `json:"DistPath"`
+	DependsOn []string  `json:"DependsOn"`
 }
 
 type RadixNode struct {
@@ -89,4 +92,46 @@ func (r *Router) findRoute(path string) *FileInfo {
 	}
 
 	return node.FileInfo
+}
+
+func (n *RadixNode) Insert(segments []string, fileInfo *FileInfo) {
+	current := n
+
+	// Pre-allocate children slice with a reasonable capacity
+	if len(current.Children) == 0 {
+		current.Children = make([]*RadixNode, 0, 8)
+	}
+
+	for i, segment := range segments {
+		// Try to find an existing child with matching segment
+		var matchingChild *RadixNode
+		for _, child := range current.Children {
+			if child.Path == segment {
+				matchingChild = child
+				break
+			}
+		}
+
+		// Create new node if no match found
+		if matchingChild == nil {
+			matchingChild = &RadixNode{
+				Path:     segment,
+				Children: make([]*RadixNode, 0, 4), // Small initial capacity for leaf nodes
+			}
+			current.Children = append(current.Children, matchingChild)
+		}
+
+		// Move to next node
+		current = matchingChild
+
+		// If this is the last segment, store the file info
+		if i == len(segments)-1 {
+			current.FileInfo = fileInfo
+		}
+	}
+
+	// Handle empty path or root case
+	if len(segments) == 0 {
+		current.FileInfo = fileInfo
+	}
 }
