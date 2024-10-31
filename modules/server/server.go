@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"gogogo/modules/config"
 	"net"
 	"net/http"
 	"time"
@@ -13,99 +14,106 @@ import (
 )
 
 type Server struct {
-	httpServer  *http.Server
-	listener    net.Listener
-	Config      *Config
-	Handler     http.Handler
-	middlewares []func(http.Handler) http.Handler
+	httpServer *http.Server
+	listener   net.Listener
+	config     *Config
 }
 
 type Config struct {
-	Host              string
-	Port              int
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	MaxHeaderBytes    int
-	KeepAliveDuration time.Duration
-	TLSConfig         *tls.Config
-	EnableHTTP2       bool
-	GracefulTimeout   time.Duration
-	MaxConnsPerIP     int
-	TCPKeepAlive      time.Duration
+	Host           string
+	Port           int
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	IdleTimeout    time.Duration
+	MaxHeaderBytes int
+	TLSConfig      *tls.Config
+	EnableHTTP2    bool
+	TCPKeepAlive   time.Duration
 }
 
-func NewServer(config *Config) *Server {
+type Handlers struct {
+	Web    http.Handler
+	SPA    http.Handler
+	Static http.Handler
+	API    http.Handler
+}
+
+func New(handlers Handlers, cfg config.Config) *Server {
+	opts := &Config{
+		Host:           cfg.Server.Host,
+		Port:           cfg.Server.Port,
+		ReadTimeout:    cfg.Server.ReadTimeout,
+		WriteTimeout:   cfg.Server.WriteTimeout,
+		IdleTimeout:    cfg.Server.IdleTimeout,
+		MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
+		EnableHTTP2:    cfg.Server.EnableHTTP2,
+		TLSConfig:      cfg.Server.TLSConfig,
+		TCPKeepAlive:   30 * time.Second,
+	}
+
+	mux := http.NewServeMux()
+
+	// API routes
+	mux.Handle("/api/", handlers.API)
+
+	// SPA routes
+	if handlers.SPA != nil {
+		mux.Handle(cfg.URLPrefixes.SPA, http.StripPrefix(cfg.URLPrefixes.SPA, handlers.SPA))
+	}
+
+	// Static files
+	mux.Handle("/static/", handlers.Static)
+	mux.Handle("/core/", handlers.Static)
+
+	// All other paths go to web handler
+	mux.Handle("/", handlers.Web)
+
+	var handler http.Handler = mux
+	if opts.EnableHTTP2 && opts.TLSConfig == nil {
+		handler = h2c.NewHandler(mux, &http2.Server{})
+	}
+
 	return &Server{
-		Config:      config,
-		middlewares: []func(http.Handler) http.Handler{},
+		config: opts,
+		httpServer: &http.Server{
+			Handler:           handler,
+			ReadTimeout:       opts.ReadTimeout,
+			WriteTimeout:      opts.WriteTimeout,
+			IdleTimeout:       opts.IdleTimeout,
+			MaxHeaderBytes:    opts.MaxHeaderBytes,
+			ReadHeaderTimeout: opts.ReadTimeout,
+		},
 	}
-}
-
-func (s *Server) Use(middleware func(http.Handler) http.Handler) {
-	s.middlewares = append(s.middlewares, middleware)
-}
-
-func (s *Server) SetHandler(handler http.Handler) {
-	s.Handler = handler
-}
-
-func (s *Server) chainMiddleware(h http.Handler) http.Handler {
-	for i := len(s.middlewares) - 1; i >= 0; i-- {
-		h = s.middlewares[i](h)
-	}
-	return h
 }
 
 func (s *Server) Start() error {
-	addr := fmt.Sprintf("%s:%d", s.Config.Host, s.Config.Port)
+	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to create listener: %w", err)
 	}
 
-	ln = tcpKeepAliveListener{
+	ln = &tcpKeepAliveListener{
 		TCPListener:     ln.(*net.TCPListener),
-		keepAlivePeriod: s.Config.TCPKeepAlive,
+		keepAlivePeriod: s.config.TCPKeepAlive,
 	}
 
 	s.listener = ln
 
-	handler := s.chainMiddleware(s.Handler)
-
-	if s.Config.EnableHTTP2 && s.Config.TLSConfig == nil {
-		handler = h2c.NewHandler(handler, &http2.Server{})
-	}
-
-	s.httpServer = &http.Server{
-		Handler:        handler,
-		ReadTimeout:    s.Config.ReadTimeout,
-		WriteTimeout:   s.Config.WriteTimeout,
-		IdleTimeout:    s.Config.IdleTimeout,
-		MaxHeaderBytes: s.Config.MaxHeaderBytes,
-	}
-
-	if s.Config.TLSConfig != nil {
-		s.httpServer.TLSConfig = s.Config.TLSConfig
-		if s.Config.EnableHTTP2 {
+	if s.config.TLSConfig != nil {
+		s.httpServer.TLSConfig = s.config.TLSConfig
+		if s.config.EnableHTTP2 {
 			http2.ConfigureServer(s.httpServer, &http2.Server{})
 		}
-		return s.httpServer.ServeTLS(s.listener, "", "")
+		return s.httpServer.ServeTLS(ln, "", "")
 	}
 
-	return s.httpServer.Serve(s.listener)
+	return s.httpServer.Serve(ln)
 }
 
-func (s *Server) Shutdown() context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Config.GracefulTimeout)
-	go func() {
-		defer cancel()
-		if err := s.httpServer.Shutdown(ctx); err != nil {
-			fmt.Printf("Server Shutdown error: %v\n", err)
-		}
-	}()
-	return ctx
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.httpServer.Shutdown(ctx)
 }
 
 type tcpKeepAliveListener struct {
@@ -113,12 +121,13 @@ type tcpKeepAliveListener struct {
 	keepAlivePeriod time.Duration
 }
 
-func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
+func (ln *tcpKeepAliveListener) Accept() (net.Conn, error) {
 	tc, err := ln.AcceptTCP()
 	if err != nil {
 		return nil, err
 	}
 	tc.SetKeepAlive(true)
 	tc.SetKeepAlivePeriod(ln.keepAlivePeriod)
+	tc.SetNoDelay(true)
 	return tc, nil
 }

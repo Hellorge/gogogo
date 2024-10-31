@@ -1,0 +1,40 @@
+flowchart TD
+    subgraph EntryPoints["Entry Points"]
+        Server[Server]
+        Server --> Router
+        Server --> |/api/*| APIHandler
+    end
+
+    subgraph RoutingLayer["Router Layer"]
+        Router --> RadixTree[Radix Tree]
+        RadixTree --> |Dist Path| ContentProcessor
+        RadixTree --> |Built Template| ContentProcessor
+        RadixTree --> |Built Static| StaticServing
+    end
+
+    subgraph BuildTime["Build Process"]
+        WebDir["web/"]
+        WebDir --> ContentDir["content/"]
+        WebDir --> TemplatesDir["templates/"]
+        WebDir --> StaticDir["static/"]
+        ContentDir & TemplatesDir & StaticDir --> BuildProcess
+        BuildProcess --> |"Hash + Move"| DistDir["dist/"]
+        BuildProcess --> |"Generate"| RouterBin["router_binary.bin"]
+    end
+
+    subgraph ResourceLayer["Resource Management"]
+        ContentProcessor & StaticServing & APIHandler --> FileManager
+        FileManager --> Coalescer
+        Coalescer --> Cache
+        Cache --> FileAccess
+    end
+
+    classDef primary fill:#2977db,stroke:#164576,stroke-width:2px,color:#fff
+    classDef secondary fill:#35b577,stroke:#1a5a3b,stroke-width:2px,color:#fff
+    classDef tertiary fill:#f4a261,stroke:#984c26,stroke-width:2px,color:#fff
+    classDef build fill:#6c757d,stroke:#495057,stroke-width:2px,color:#fff
+    
+    class Server,Router primary
+    class FileManager,Coalescer,Cache,FileAccess secondary
+    class ContentProcessor,APIHandler tertiary
+    class BuildProcess,RouterBin,WebDir build

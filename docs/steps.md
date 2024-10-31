@@ -41,11 +41,9 @@ steps takes for this project:
 +++
 - binary production files, and templating comtenting in build process
 - logger and profiler features
-- fasthttp or a custom one that leverages sendfile syscall for zero-copy file transfers.
 - worker pool for request serving
 - Consider making it optional or implementing a more efficient, lock-free metrics collection mechanism.
 - multi-level cache (memory -> shared memory -> disk)
--
 - in server folder add config file for template selection, header imports, seo and content path aliases
 - handle multiple sites using '/server/{sitename}/home'
 - client side page caching based on client system specs
@@ -56,7 +54,7 @@ steps takes for this project:
 - Single-source Distributed serving capabilities
 - Js MayNeed dynamic module loading system, for known resource combinations, we can use HTTP/2 Server Push to send critical assets before the client requests them.
 <link rel="preload" href="/api/content/next-likely-page" as="fetch">
-
+-Implement response compression (e.g., gzip) for textual content. maybe integrated in build process to compress data once and skip runtime load
 
 - implement a testing framework for both client and server
 - add built-in support for logging and error tracking
@@ -123,12 +121,6 @@ We could pre-load frequently accessed content into memory at startup, reducing d
 3. Optimize template parsing:
 Parse templates once at startup and store them in memory.
 
-4. Implement response compression:
-Use gzip compression for responses to reduce bandwidth and improve loading times.
-
-5. Use a more efficient router:
-Consider using a high-performance router like `httprouter` or `fasthttp` for faster request routing.
-
 6. Implement aggressive caching headers:
 Set appropriate caching headers to allow client-side caching of static assets.
 
@@ -144,18 +136,31 @@ Use Go's built-in profiling tools to identify and optimize the most frequently e
 5. Scalability:
    - While the current design is efficient for a single server, consider how the application might scale horizontally. This could involve distributed caching or load balancing considerations.
 
-
 9. Metrics and Monitoring:
    - While there's a good start with metrics, consider integrating with standard monitoring solutions (e.g., Prometheus) for better observability in production environments.
 
-12. HTTP/2 and HTTP/3 Support:
-    - To further improve performance, especially for SPA mode, consider adding support for newer HTTP protocols.
+### self managed worker pool
 
-13. Caching Strategies:
-    - While there's a caching system in place, consider implementing more advanced caching strategies like stale-while-revalidate or cache warming.
+### Implement a multi-level cache (memory, disk, distributed) for even faster access.
+Add cache warming strategies for frequently accessed content.
 
-14. Build Process Optimization:
-    - The build process could potentially be parallelized further to reduce build times, especially for large projects.
+### 2. Caching (cache.go)
+- The current implementation uses a fixed number of shards (256). Consider making this configurable based on expected load.
 
-15. Resource Management:
-    - Implement more sophisticated resource management, such as connection pooling for any database connections, to further optimize performance under high load.
+## Suggestions for Further Optimization
+Integrate distributed tracing (e.g., OpenTelemetry) for better insights into system performance.
+Implement real-time alerting for performance anomalies.
+
+1. **Profiling**: Implement more comprehensive profiling, especially in production mode, to identify actual bottlenecks under real-world load.
+
+2. **Connection Pooling**: If the application interacts with databases or other services, ensure proper connection pooling is implemented.
+
+3. **Static Asset Serving**: Consider offloading static asset serving to a dedicated static file server or CDN in production.
+
+5. **Memory Management**: Implement more granular memory management, possibly using sync.Pool for frequently allocated and deallocated objects.
+
+6. **Benchmarking**: Develop a comprehensive suite of benchmarks to measure the impact of any changes on performance.
+
+7. **Hot Path Optimization**: Identify the most frequently executed code paths and focus optimization efforts there.
+
+8. **Async Processing**: For non-critical operations, consider implementing asynchronous processing using message queues or worker pools.

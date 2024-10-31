@@ -8,6 +8,15 @@ metrics_enabled = true
 caching_enabled = true
 coalescer_enabled = true
 
+# Server timeouts
+read_timeout = "15s"  # Time allowed to read the request
+write_timeout = "15s" # Time allowed to write the response
+idle_timeout = "60s"  # Time allowed for idle keep-alive connections
+
+# HTTP settings
+max_header_bytes = 1048576 # 1MB max header size
+enable_http2 = true        # Enable HTTP/2 support
+
 # Cache settings
 [cache]
 max_size = 100000

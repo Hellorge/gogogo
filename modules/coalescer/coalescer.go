@@ -6,12 +6,7 @@ import (
 	"sync/atomic"
 )
 
-const shardCount = 32 // You can adjust this based on your needs
-
-type Shard struct {
-	sync.RWMutex
-	calls map[string]*Call
-}
+const shardCount = 32 // Balance between memory usage and lock contention
 
 type Call struct {
 	wg     sync.WaitGroup
@@ -20,54 +15,66 @@ type Call struct {
 	loaded int32
 }
 
+type Shard struct {
+	sync.RWMutex
+	calls map[string]*Call
+}
+
 type Coalescer struct {
 	shards [shardCount]Shard
 }
+
 func NewCoalescer() *Coalescer {
 	c := &Coalescer{}
+	// Initialize shards
 	for i := range c.shards {
 		c.shards[i].calls = make(map[string]*Call)
 	}
 	return c
 }
 
-func (co *Coalescer) getShard(key string) *Shard {
+func (c *Coalescer) getShard(key string) *Shard {
 	h := fnv.New32a()
 	h.Write([]byte(key))
-	return &co.shards[h.Sum32()%shardCount]
+	return &c.shards[h.Sum32()%shardCount]
 }
 
-func (co *Coalescer) Do(key string, fn func() ([]byte, error)) ([]byte, error) {
-	shard := co.getShard(key)
+// Do coalesces multiple requests for the same key into a single operation
+func (c *Coalescer) Do(key string, fn func() ([]byte, error)) ([]byte, error) {
+	shard := c.getShard(key)
+
+	// Fast path: check if call is in progress
 	shard.RLock()
-	c, ok := shard.calls[key]
+	if call, ok := shard.calls[key]; ok {
+		shard.RUnlock()
+		call.wg.Wait()
+		return call.val, call.err
+	}
 	shard.RUnlock()
 
-	if ok {
-		c.wg.Wait()
-		return c.val, c.err
-	}
-
-	c = &Call{}
-	c.wg.Add(1)
-
+	// Slow path: create new call
 	shard.Lock()
-	existing, loaded := shard.calls[key]
-	if loaded {
+	if call, ok := shard.calls[key]; ok {
+		// Double-check after acquiring lock
 		shard.Unlock()
-		existing.wg.Wait()
-		return existing.val, existing.err
+		call.wg.Wait()
+		return call.val, call.err
 	}
-	shard.calls[key] = c
+
+	call := &Call{}
+	call.wg.Add(1)
+	shard.calls[key] = call
 	shard.Unlock()
 
-	c.val, c.err = fn()
-	atomic.StoreInt32(&c.loaded, 1)
-	c.wg.Done()
+	// Execute function
+	call.val, call.err = fn()
+	atomic.StoreInt32(&call.loaded, 1)
+	call.wg.Done()
 
+	// Cleanup
 	shard.Lock()
 	delete(shard.calls, key)
 	shard.Unlock()
 
-	return c.val, c.err
+	return call.val, call.err
 }

@@ -1,0 +1,29 @@
+flowchart TD
+    subgraph EntryPoints["Entry Points"]
+        Server[Server]
+        Server --> |/api/*| APIHandler
+        Server --> Router
+    end
+
+    subgraph RequestHandling["Request Handling"]
+        Router --> |/content/*| ContentHandler
+        Router --> |Other Paths| StaticHandler
+
+        ContentHandler --> |Template Processing| FileManager
+        StaticHandler --> |ServeContent| FileManager
+        APIHandler --> FileManager
+    end
+
+    subgraph ResourceLayer["Resource Layer"]
+        FileManager --> Coalescer
+        Coalescer --> Cache
+        Cache --> FileAccess
+    end
+
+    classDef primary fill:#2977db,stroke:#164576,stroke-width:2px,color:#fff
+    classDef secondary fill:#35b577,stroke:#1a5a3b,stroke-width:2px,color:#fff
+    classDef tertiary fill:#f4a261,stroke:#984c26,stroke-width:2px,color:#fff
+
+    class Server,Router primary
+    class FileManager,Coalescer,Cache,FileAccess secondary
+    class ContentHandler,StaticHandler,APIHandler tertiary

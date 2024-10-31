@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -14,9 +15,15 @@ type Config struct {
 		ProductionMode bool `toml:"production_mode"`
 		SPAMode        bool `toml:"spa_mode"`
 
-		MetricsEnabled   bool `toml:"metrics_enabled"`
-		CachingEnabled   bool `toml:"caching_enabled"`
-		CoalescerEnabled bool `toml:"coalescer_enabled"`
+		MetricsEnabled   bool          `toml:"metrics_enabled"`
+		CachingEnabled   bool          `toml:"caching_enabled"`
+		CoalescerEnabled bool          `toml:"coalescer_enabled"`
+		ReadTimeout      time.Duration `toml:"read_timeout"`
+		WriteTimeout     time.Duration `toml:"write_timeout"`
+		IdleTimeout      time.Duration `toml:"idle_timeout"`
+		MaxHeaderBytes   int           `toml:"max_header_bytes"`
+		EnableHTTP2      bool          `toml:"enable_http2"`
+		TLSConfig        *tls.Config   `toml:"tls"`
 	} `toml:"server"`
 
 	Cache struct {
