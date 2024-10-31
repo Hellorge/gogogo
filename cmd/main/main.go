@@ -58,7 +58,7 @@ func main() {
 		Router:  r,
 	})
 
-	templateEngine := templates.New(fm, cfg.Directories.Templates)
+	templateEngine := templates.New(fm, cfg.Directories.Templates, cfg.Server.ProductionMode)
 
 	// Get main template
 	mainTemplate, err := templateEngine.GetTemplate(filepath.Join(cfg.Templates.Main))

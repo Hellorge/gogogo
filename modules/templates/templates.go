@@ -14,33 +14,31 @@ type TemplateEngine struct {
 	templateMutex sync.RWMutex
 	fm            *filemanager.FileManager
 	dir           string
+	GetTemplate   func(string) (*template.Template, error)
 }
 
-func New(fm *filemanager.FileManager, dir string) *TemplateEngine {
-	return &TemplateEngine{
+func New(fm *filemanager.FileManager, dir string, productionMode bool) *TemplateEngine {
+	t := &TemplateEngine{
 		fm:  fm,
 		dir: dir,
 	}
+
+	if productionMode {
+		t.GetTemplate = t.getProduction
+	} else {
+		t.GetTemplate = t.getDevelopment
+	}
+
+	return t
 }
 
-func (t *TemplateEngine) GetTemplate(name string) (*template.Template, error) {
-	// Check cache first
-	t.templateMutex.RLock()
-	if tmpl, ok := t.templates.Load(name); ok {
-		t.templateMutex.RUnlock()
-		return tmpl.(*template.Template), nil
-	}
-	t.templateMutex.RUnlock()
-
-	// Not in cache, load and parse
-	t.templateMutex.Lock()
-	defer t.templateMutex.Unlock()
-
-	// Double-check after acquiring lock
+func (t *TemplateEngine) getProduction(name string) (*template.Template, error) {
+	// Fast path - check sync.Map directly (it's already concurrent-safe)
 	if tmpl, ok := t.templates.Load(name); ok {
 		return tmpl.(*template.Template), nil
 	}
 
+	// Slow path - load and parse template
 	path := filepath.Join(t.dir, name, "index.html")
 	content, err := t.fm.GetContent(path)
 	if err != nil {
@@ -52,6 +50,20 @@ func (t *TemplateEngine) GetTemplate(name string) (*template.Template, error) {
 		return nil, fmt.Errorf("error parsing template: %w", err)
 	}
 
-	t.templates.Store(name, tmpl)
+	// Store in sync.Map (handles race conditions internally)
+	actual, loaded := t.templates.LoadOrStore(name, tmpl)
+	if loaded {
+		return actual.(*template.Template), nil
+	}
 	return tmpl, nil
+}
+
+func (t *TemplateEngine) getDevelopment(name string) (*template.Template, error) {
+	path := filepath.Join(t.dir, name, "index.html")
+	content, err := t.fm.GetContent(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading template file: %w", err)
+	}
+
+	return template.New(filepath.Base(name)).Parse(string(content))
 }

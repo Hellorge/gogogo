@@ -13,10 +13,10 @@ import (
 
 // Pre-computed paths
 const (
-	contentFile = "content.html"
-	metaFile    = "meta.toml"
-	styleFile   = "style.css"
-	scriptFile  = "script.js"
+	contentFile = "/content.html"
+	metaFile    = "/meta.toml"
+	styleFile   = "/style.css"
+	scriptFile  = "/script.js"
 )
 
 // TemplateData with zero allocation defaults
@@ -68,6 +68,12 @@ type ContentLoader struct {
 	wg      sync.WaitGroup
 }
 
+var pathPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 0, 256)
+	},
+}
+
 func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, contentPath string, SPAMode bool) *WebHandler {
 	return &WebHandler{
 		fm:          fm,
@@ -113,37 +119,54 @@ func NewAPIHandler(fm *filemanager.FileManager, contentPath string) *APIHandler 
 
 // loadContent loads all content in parallel
 func loadContent(fm *filemanager.FileManager, basePath string) *ContentLoader {
-	cl := &ContentLoader{}
-	cl.wg.Add(4)
+	// Get path buffer from pool
+	pathBuf := pathPool.Get().([]byte)
+	pathBuf = append(pathBuf[:0], basePath...)
 
-	// Load content and meta in parallel
+	// First check if content exists - no point spawning goroutines if not
+	pathBuf = append(pathBuf, contentFile...)
+	content, err := fm.GetContent(string(pathBuf))
+	if err != nil {
+		pathPool.Put(pathBuf)
+		return &ContentLoader{err: err}
+	}
+
+	cl := &ContentLoader{content: content}
+	cl.wg.Add(3) // Reduced from 4 since content is already loaded
+
 	go func() {
 		defer cl.wg.Done()
-		cl.content, cl.err = fm.GetContent(filepath.Join(basePath, contentFile))
+		pathBuf := pathPool.Get().([]byte)
+		pathBuf = append(pathBuf[:0], basePath...)
+		pathBuf = append(pathBuf, metaFile...)
+		cl.meta, _ = fm.GetContent(string(pathBuf))
+		pathPool.Put(pathBuf)
 	}()
 
 	go func() {
 		defer cl.wg.Done()
-		cl.meta, _ = fm.GetContent(filepath.Join(basePath, metaFile))
+		pathBuf := pathPool.Get().([]byte)
+		pathBuf = append(pathBuf[:0], basePath...)
+		pathBuf = append(pathBuf, styleFile...)
+		cl.style, _ = fm.GetContent(string(pathBuf))
+		pathPool.Put(pathBuf)
 	}()
 
 	go func() {
 		defer cl.wg.Done()
-		cl.style, _ = fm.GetContent(filepath.Join(basePath, styleFile))
+		pathBuf := pathPool.Get().([]byte)
+		pathBuf = append(pathBuf[:0], basePath...)
+		pathBuf = append(pathBuf, scriptFile...)
+		cl.script, _ = fm.GetContent(string(pathBuf))
+		pathPool.Put(pathBuf)
 	}()
 
-	go func() {
-		defer cl.wg.Done()
-		cl.script, _ = fm.GetContent(filepath.Join(basePath, scriptFile))
-	}()
-
-	cl.wg.Wait()
 	return cl
 }
 
 func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	if path == "/" || path == "" {
+	if len(path) <= 1 {
 		path = "home"
 	}
 
@@ -187,7 +210,7 @@ func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	if path == "/" || path == "" {
+	if len(path) <= 1 {
 		path = "home"
 	}
 
@@ -257,7 +280,7 @@ func (h *StaticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[5:] // strip /api/
-	if path == "" {
+	if len(path) <= 1 {
 		path = "home"
 	}
 

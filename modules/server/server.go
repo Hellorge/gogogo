@@ -130,3 +130,38 @@ func (ln *tcpKeepAliveListener) Accept() (net.Conn, error) {
 	tc.SetNoDelay(true)
 	return tc, nil
 }
+
+// func (ln *tcpKeepAliveListener) Accept() (net.Conn, error) {
+//     tc, err := ln.AcceptTCP()
+//     if err != nil {
+//         return nil, err
+//     }
+
+//     if err = tc.SetKeepAlive(true); err != nil {
+//         tc.Close()
+//         return nil, err
+//     }
+
+//     if err = tc.SetKeepAlivePeriod(ln.keepAlivePeriod); err != nil {
+//         tc.Close()
+//         return nil, err
+//     }
+
+//     if err = tc.SetNoDelay(true); err != nil {
+//         tc.Close()
+//         return nil, err
+//     }
+
+//     // Set buffer sizes optimally
+//     if err = tc.SetReadBuffer(64 * 1024); err != nil {
+//         tc.Close()
+//         return nil, err
+//     }
+
+//     if err = tc.SetWriteBuffer(64 * 1024); err != nil {
+//         tc.Close()
+//         return nil, err
+//     }
+
+//     return tc, nil
+// }

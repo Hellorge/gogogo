@@ -54,6 +54,7 @@ func (fm *FileManager) getDevelopment(path string) ([]byte, error) {
 }
 
 func (fm *FileManager) getProduction(path string) ([]byte, error) {
+
 	distPath, ok := fm.router.Route(path)
 	if !ok {
 		return nil, ErrNotFound
