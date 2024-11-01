@@ -57,25 +57,56 @@ func NewCache(maxSize int) *Cache {
 func (c *Cache) Get(key string) ([]byte, bool) {
 	shard := c.shards[c.shardIndex(key)]
 	shard.lock.RLock()
-	defer shard.lock.RUnlock()
-
 	item := shard.items.Get(CacheEntry{Key: key})
 	if item == nil {
+		shard.lock.RUnlock()
 		return nil, false
 	}
 
 	entry := item.(CacheEntry)
-	if time.Now().After(entry.Expiry) {
-		shard.items.Delete(entry)
+	now := time.Now()
+
+	// If expired, clean up asynchronously and return not found
+	if now.After(entry.Expiry) {
+		shard.lock.RUnlock()
+		go c.cleanupEntry(shard, entry)
 		return nil, false
 	}
 
-	// Update frequency and last access
-	entry.Frequency++
-	entry.LastAccess = time.Now().UnixNano()
-	shard.items.Set(entry)
+	// Fast path - just return the value
+	value := entry.Value
+	shard.lock.RUnlock()
 
-	return entry.Value, true
+	// Async update for frequency and last access
+	go c.updateEntryStats(shard, entry)
+
+	return value, true
+}
+
+func (c *Cache) cleanupEntry(shard *Shard, entry CacheEntry) {
+	shard.lock.Lock()
+	// Double check if it's still the same entry and still expired
+	if current := shard.items.Get(CacheEntry{Key: entry.Key}); current != nil {
+		currentEntry := current.(CacheEntry)
+		if currentEntry.Expiry == entry.Expiry {
+			shard.items.Delete(entry)
+		}
+	}
+	shard.lock.Unlock()
+}
+
+func (c *Cache) updateEntryStats(shard *Shard, entry CacheEntry) {
+	shard.lock.Lock()
+	// Double check if entry still exists and update its stats
+	if current := shard.items.Get(CacheEntry{Key: entry.Key}); current != nil {
+		currentEntry := current.(CacheEntry)
+		if currentEntry.Expiry == entry.Expiry {
+			currentEntry.Frequency++
+			currentEntry.LastAccess = time.Now().UnixNano()
+			shard.items.Set(currentEntry)
+		}
+	}
+	shard.lock.Unlock()
 }
 
 func (c *Cache) Set(key string, value []byte, expiry time.Time) {

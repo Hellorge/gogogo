@@ -9,14 +9,15 @@ import (
 
 	"gogogo/modules/filemanager"
 	"gogogo/modules/metaparser"
+	"gogogo/modules/pathbuilder"
 )
 
 // Pre-computed paths
 const (
-	contentFile = "/content.html"
-	metaFile    = "/meta.toml"
-	styleFile   = "/style.css"
-	scriptFile  = "/script.js"
+	contentFile = "content.html"
+	metaFile    = "meta.toml"
+	styleFile   = "style.css"
+	scriptFile  = "script.js"
 )
 
 // TemplateData with zero allocation defaults
@@ -32,19 +33,16 @@ type TemplateData struct {
 	IsSPAMode bool
 }
 
-// Handlers using shared buffer pools
 type WebHandler struct {
 	fm          *filemanager.FileManager
 	template    *template.Template
 	contentPath string
-	bufferPool  sync.Pool
 	SPAMode     bool
 }
 
 type SPAHandler struct {
 	fm          *filemanager.FileManager
 	contentPath string
-	bufferPool  sync.Pool
 	SPAMode     bool
 }
 
@@ -55,7 +53,6 @@ type StaticHandler struct {
 type APIHandler struct {
 	fm          *filemanager.FileManager
 	contentPath string
-	bufferPool  sync.Pool
 }
 
 // ContentLoader for efficient content loading
@@ -68,10 +65,12 @@ type ContentLoader struct {
 	wg      sync.WaitGroup
 }
 
-var pathPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 0, 256)
-	},
+func (cl *ContentLoader) reset() {
+	cl.content = nil
+	cl.meta = nil
+	cl.style = nil
+	cl.script = nil
+	cl.err = nil
 }
 
 func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, contentPath string, SPAMode bool) *WebHandler {
@@ -80,11 +79,6 @@ func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, content
 		template:    tmpl,
 		contentPath: contentPath,
 		SPAMode:     SPAMode,
-		bufferPool: sync.Pool{
-			New: func() interface{} {
-				return &TemplateData{Meta: defaultMeta}
-			},
-		},
 	}
 }
 
@@ -93,11 +87,6 @@ func NewSPAHandler(fm *filemanager.FileManager, contentPath string, SPAMode bool
 		fm:          fm,
 		contentPath: contentPath,
 		SPAMode:     SPAMode,
-		bufferPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 0, 4096)
-			},
-		},
 	}
 }
 
@@ -109,58 +98,44 @@ func NewAPIHandler(fm *filemanager.FileManager, contentPath string) *APIHandler 
 	return &APIHandler{
 		fm:          fm,
 		contentPath: contentPath,
-		bufferPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 0, 1024)
-			},
-		},
 	}
 }
 
-// loadContent loads all content in parallel
-func loadContent(fm *filemanager.FileManager, basePath string) *ContentLoader {
-	// Get path buffer from pool
-	pathBuf := pathPool.Get().([]byte)
-	pathBuf = append(pathBuf[:0], basePath...)
+func loadContent(fm *filemanager.FileManager, dir string, path string) *ContentLoader {
+	cl := &ContentLoader{}
+	cl.reset()
 
-	// First check if content exists - no point spawning goroutines if not
-	pathBuf = append(pathBuf, contentFile...)
-	content, err := fm.GetContent(string(pathBuf))
-	if err != nil {
-		pathPool.Put(pathBuf)
-		return &ContentLoader{err: err}
-	}
+	pb := pathbuilder.AcquirePathBuilder()
+	defer pb.Release()
 
-	cl := &ContentLoader{content: content}
-	cl.wg.Add(3) // Reduced from 4 since content is already loaded
+	contentPath := pb.Join(dir, path, contentFile).String()
+	metaPath := pb.Join(dir, path, metaFile).String()
+	stylePath := pb.Join(dir, path, styleFile).String()
+	scriptPath := pb.Join(dir, path, scriptFile).String()
+
+	cl.wg.Add(4)
 
 	go func() {
 		defer cl.wg.Done()
-		pathBuf := pathPool.Get().([]byte)
-		pathBuf = append(pathBuf[:0], basePath...)
-		pathBuf = append(pathBuf, metaFile...)
-		cl.meta, _ = fm.GetContent(string(pathBuf))
-		pathPool.Put(pathBuf)
+		cl.content, cl.err = fm.GetContent(contentPath)
 	}()
 
 	go func() {
 		defer cl.wg.Done()
-		pathBuf := pathPool.Get().([]byte)
-		pathBuf = append(pathBuf[:0], basePath...)
-		pathBuf = append(pathBuf, styleFile...)
-		cl.style, _ = fm.GetContent(string(pathBuf))
-		pathPool.Put(pathBuf)
+		cl.meta, _ = fm.GetContent(metaPath)
 	}()
 
 	go func() {
 		defer cl.wg.Done()
-		pathBuf := pathPool.Get().([]byte)
-		pathBuf = append(pathBuf[:0], basePath...)
-		pathBuf = append(pathBuf, scriptFile...)
-		cl.script, _ = fm.GetContent(string(pathBuf))
-		pathPool.Put(pathBuf)
+		cl.style, _ = fm.GetContent(stylePath)
 	}()
 
+	go func() {
+		defer cl.wg.Done()
+		cl.script, _ = fm.GetContent(scriptPath)
+	}()
+
+	cl.wg.Wait()
 	return cl
 }
 
@@ -170,19 +145,15 @@ func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "home"
 	}
 
-	contentPath := filepath.Join(h.contentPath, path)
-	cl := loadContent(h.fm, contentPath)
+	cl := loadContent(h.fm, h.contentPath, path)
+
 	if cl.err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
-	// Get data from pool
-	data := h.bufferPool.Get().(*TemplateData)
-	defer h.bufferPool.Put(data)
-
 	// Reset data
-	*data = TemplateData{
+	data := TemplateData{
 		Content:   template.HTML(cl.content),
 		Meta:      defaultMeta,
 		IsSPAMode: h.SPAMode,
@@ -214,16 +185,11 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "home"
 	}
 
-	contentPath := filepath.Join(h.contentPath, path)
-	cl := loadContent(h.fm, contentPath)
+	cl := loadContent(h.fm, h.contentPath, path)
 	if cl.err != nil {
 		http.NotFound(w, r)
 		return
 	}
-
-	// Get buffer from pool
-	buf := h.bufferPool.Get().([]byte)
-	defer h.bufferPool.Put(buf)
 
 	// Reuse buffer for response
 	resp := struct {
@@ -235,10 +201,11 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Meta      *metaparser.MetaData `json:"Meta,omitempty"`
 		IsSPAMode bool
 	}{
-		Content: string(cl.content),
+		Content:   string(cl.content),
+		IsSPAMode: h.SPAMode,
+		Meta:      defaultMeta,
 	}
 
-	resp.IsSPAMode = h.SPAMode
 	if meta, err := metaparser.ParseMetaData(cl.meta); err == nil {
 		resp.Meta = meta
 	}
@@ -289,10 +256,6 @@ func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-
-	// Get buffer from pool
-	buf := h.bufferPool.Get().([]byte)
-	defer h.bufferPool.Put(buf)
 
 	w.Header().Set("Content-Type", "application/json")
 	encoder := json.NewEncoder(w)
