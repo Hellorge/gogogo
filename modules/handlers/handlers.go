@@ -9,7 +9,6 @@ import (
 
 	"gogogo/modules/filemanager"
 	"gogogo/modules/metaparser"
-	"gogogo/modules/pathbuilder"
 )
 
 // Pre-computed paths
@@ -20,17 +19,16 @@ const (
 	scriptFile  = "script.js"
 )
 
-// TemplateData with zero allocation defaults
 var defaultMeta = &metaparser.MetaData{}
 
-type TemplateData struct {
-	Content   template.HTML
-	Style     template.CSS
-	Script    template.JS
-	StyleURL  string
-	ScriptURL string
-	Meta      *metaparser.MetaData
-	IsSPAMode bool
+type PageData struct {
+	content      []byte
+	style        []byte
+	script       []byte
+	styleExists  string
+	scriptExists string
+	meta         *metaparser.MetaData
+	err          error
 }
 
 type WebHandler struct {
@@ -53,24 +51,6 @@ type StaticHandler struct {
 type APIHandler struct {
 	fm          *filemanager.FileManager
 	contentPath string
-}
-
-// ContentLoader for efficient content loading
-type ContentLoader struct {
-	content []byte
-	meta    []byte
-	style   []byte
-	script  []byte
-	err     error
-	wg      sync.WaitGroup
-}
-
-func (cl *ContentLoader) reset() {
-	cl.content = nil
-	cl.meta = nil
-	cl.style = nil
-	cl.script = nil
-	cl.err = nil
 }
 
 func NewWebHandler(fm *filemanager.FileManager, tmpl *template.Template, contentPath string, SPAMode bool) *WebHandler {
@@ -101,42 +81,56 @@ func NewAPIHandler(fm *filemanager.FileManager, contentPath string) *APIHandler 
 	}
 }
 
-func loadContent(fm *filemanager.FileManager, dir string, path string) *ContentLoader {
-	cl := &ContentLoader{}
-	cl.reset()
+func loadContent(fm *filemanager.FileManager, dir string, path string) *PageData {
+	contentPath := dir + "/" + path + "/" + contentFile
+	metaPath := dir + "/" + path + "/" + metaFile
+	stylePath := dir + "/" + path + "/" + styleFile
+	scriptPath := dir + "/" + path + "/" + scriptFile
 
-	pb := pathbuilder.AcquirePathBuilder()
-	defer pb.Release()
+	pd := &PageData{
+		meta: defaultMeta,
+	}
 
-	contentPath := pb.Join(dir, path, contentFile).String()
-	metaPath := pb.Join(dir, path, metaFile).String()
-	stylePath := pb.Join(dir, path, styleFile).String()
-	scriptPath := pb.Join(dir, path, scriptFile).String()
-
-	cl.wg.Add(4)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	go func() {
-		defer cl.wg.Done()
-		cl.content, cl.err = fm.GetContent(contentPath)
+		defer wg.Done()
+		pd.content, pd.err = fm.GetContent(contentPath)
 	}()
 
 	go func() {
-		defer cl.wg.Done()
-		cl.meta, _ = fm.GetContent(metaPath)
+		defer wg.Done()
+		metaContent, err := fm.GetContent(metaPath)
+		if err == nil {
+			if meta, err := metaparser.ParseMetaData(metaContent); err == nil {
+				pd.meta = meta
+			}
+		}
 	}()
 
-	go func() {
-		defer cl.wg.Done()
-		cl.style, _ = fm.GetContent(stylePath)
-	}()
+	wg.Wait()
+	if pd.err != nil {
+		return pd
+	}
 
-	go func() {
-		defer cl.wg.Done()
-		cl.script, _ = fm.GetContent(scriptPath)
-	}()
+	if pd.meta.InlineStyle {
+		if style, err := fm.GetContent(stylePath); err == nil {
+			pd.style = style
+		}
+	} else if fm.Exists(stylePath) {
+		pd.styleExists = stylePath
+	}
 
-	cl.wg.Wait()
-	return cl
+	if pd.meta.InlineScript {
+		if script, err := fm.GetContent(scriptPath); err == nil {
+			pd.script = script
+		}
+	} else if fm.Exists(scriptPath) {
+		pd.scriptExists = scriptPath
+	}
+
+	return pd
 }
 
 func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -145,34 +139,48 @@ func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "home"
 	}
 
-	cl := loadContent(h.fm, h.contentPath, path)
-
-	if cl.err != nil {
+	pc := loadContent(h.fm, h.contentPath, path)
+	if pc.err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
-	// Reset data
-	data := TemplateData{
-		Content:   template.HTML(cl.content),
-		Meta:      defaultMeta,
+	// HTTP/2 Push if available and files exist
+	if pusher, ok := w.(http.Pusher); ok {
+		if pc.styleExists != "" {
+			pusher.Push(pc.styleExists, &http.PushOptions{
+				Method: "GET",
+				Header: http.Header{
+					"Accept": []string{"text/css"},
+				},
+			})
+		}
+		if pc.scriptExists != "" {
+			pusher.Push(pc.scriptExists, &http.PushOptions{
+				Method: "GET",
+				Header: http.Header{
+					"Accept": []string{"application/javascript"},
+				},
+			})
+		}
+	}
+
+	data := struct {
+		Content   template.HTML
+		Style     template.CSS
+		Script    template.JS
+		StyleURL  string
+		ScriptURL string
+		Meta      *metaparser.MetaData
+		IsSPAMode bool
+	}{
+		Meta:      pc.meta,
+		Content:   template.HTML(pc.content),
+		Style:     template.CSS(pc.style),
+		Script:    template.JS(pc.script),
+		StyleURL:  pc.styleExists,
+		ScriptURL: pc.scriptExists,
 		IsSPAMode: h.SPAMode,
-	}
-
-	if meta, err := metaparser.ParseMetaData(cl.meta); err == nil {
-		data.Meta = meta
-	}
-
-	if data.Meta.InlineStyle && len(cl.style) > 0 {
-		data.Style = template.CSS(cl.style)
-	} else {
-		data.StyleURL = filepath.Join(path, styleFile)
-	}
-
-	if data.Meta.InlineScript && len(cl.script) > 0 {
-		data.Script = template.JS(cl.script)
-	} else {
-		data.ScriptURL = filepath.Join(path, scriptFile)
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -185,10 +193,30 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "home"
 	}
 
-	cl := loadContent(h.fm, h.contentPath, path)
-	if cl.err != nil {
+	pc := loadContent(h.fm, h.contentPath, path)
+	if pc.err != nil {
 		http.NotFound(w, r)
 		return
+	}
+
+	// HTTP/2 Push if available and files exist
+	if pusher, ok := w.(http.Pusher); ok {
+		if pc.styleExists != "" {
+			pusher.Push(pc.styleExists, &http.PushOptions{
+				Method: "GET",
+				Header: http.Header{
+					"Accept": []string{"text/css"},
+				},
+			})
+		}
+		if pc.scriptExists != "" {
+			pusher.Push(pc.scriptExists, &http.PushOptions{
+				Method: "GET",
+				Header: http.Header{
+					"Accept": []string{"application/javascript"},
+				},
+			})
+		}
 	}
 
 	// Reuse buffer for response
@@ -201,25 +229,13 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Meta      *metaparser.MetaData `json:"Meta,omitempty"`
 		IsSPAMode bool
 	}{
-		Content:   string(cl.content),
+		Meta:      pc.meta,
+		Content:   string(pc.content),
+		Style:     string(pc.style),
+		Script:    string(pc.script),
+		StyleURL:  pc.styleExists,
+		ScriptURL: pc.scriptExists,
 		IsSPAMode: h.SPAMode,
-		Meta:      defaultMeta,
-	}
-
-	if meta, err := metaparser.ParseMetaData(cl.meta); err == nil {
-		resp.Meta = meta
-	}
-
-	if resp.Meta.InlineStyle && len(cl.style) > 0 {
-		resp.Style = string(cl.style)
-	} else {
-		resp.StyleURL = filepath.Join(path, styleFile)
-	}
-
-	if resp.Meta.InlineScript && len(cl.script) > 0 {
-		resp.Script = string(cl.script)
-	} else {
-		resp.ScriptURL = filepath.Join(path, scriptFile)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

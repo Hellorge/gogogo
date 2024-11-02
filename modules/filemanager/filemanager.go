@@ -23,6 +23,8 @@ type FileManager struct {
 	router     *router.Router
 	rootDir    string
 	GetContent func(path string) ([]byte, error)
+	OpenFile   func(path string) (*os.File, error)
+	Exists     func(path string) bool
 }
 
 type Config struct {
@@ -42,11 +44,25 @@ func New(fa *fileaccess.FileAccess, ca *cache.Cache, co *coalescer.Coalescer, cf
 	// Set the appropriate GetContent function based on whether Router exists
 	if cfg.Router != nil {
 		fm.GetContent = fm.getProduction
+		fm.Exists = fm.ExistsProduction
+		fm.OpenFile = fm.OpenProduction
 	} else {
 		fm.GetContent = fm.getDevelopment
+		fm.Exists = fm.ExistsDevelopment
+		fm.OpenFile = fm.OpenDevelopment
 	}
 
 	return fm
+}
+
+func (fm *FileManager) ExistsDevelopment(path string) bool {
+	_, err := fm.fileAccess.Stat(filepath.Join(fm.rootDir, path))
+	return err == nil
+}
+
+func (fm *FileManager) ExistsProduction(path string) bool {
+	_, ok := fm.router.Route(path)
+	return ok
 }
 
 func (fm *FileManager) getDevelopment(path string) ([]byte, error) {
@@ -54,7 +70,6 @@ func (fm *FileManager) getDevelopment(path string) ([]byte, error) {
 }
 
 func (fm *FileManager) getProduction(path string) ([]byte, error) {
-
 	distPath, ok := fm.router.Route(path)
 	if !ok {
 		return nil, ErrNotFound
@@ -81,13 +96,14 @@ func (fm *FileManager) getProduction(path string) ([]byte, error) {
 }
 
 // OpenFile opens a file for direct reading (used by ServeContent)
-func (fm *FileManager) OpenFile(path string) (*os.File, error) {
-	if fm.router != nil {
-		distPath, ok := fm.router.Route(path)
-		if !ok {
-			return nil, ErrNotFound
-		}
-		return fm.fileAccess.Open(distPath)
+func (fm *FileManager) OpenDevelopment(path string) (*os.File, error) {
+	return fm.fileAccess.Open(path)
+}
+
+func (fm *FileManager) OpenProduction(path string) (*os.File, error) {
+	distPath, ok := fm.router.Route(path)
+	if !ok {
+		return nil, ErrNotFound
 	}
-	return fm.fileAccess.Open(filepath.Join(fm.rootDir, path))
+	return fm.fileAccess.Open(distPath)
 }
