@@ -13,6 +13,6 @@ steps to run:
 
 3. commands:
 	cd into project root
-	start server = go run ./cmd/main
-	build assets = go run ./cmd/build
-	check metrics = go run ./cmd/stats //broken as of now
+	- start server = go run ./cmd/main
+	- build assets = go run ./cmd/build
+	- check metrics = go run ./cmd/stats //broken as of now

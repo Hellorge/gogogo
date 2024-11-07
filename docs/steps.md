@@ -1,4 +1,4 @@
-steps takes for this project:
+steps to run:
 
 1. installed go
 
