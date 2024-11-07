@@ -2,11 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"gogogo/modules/config"
 	"log"
-	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 )
@@ -52,46 +49,15 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if *out != "" {
-		cfg.Directories.Dist = *out
-	}
-
 	// Initialize build context
 	ctx := BuildContext{
 		concurrency: *concurrency,
-		fileCache:   NewFileCache(),
-		buildCache:  NewBuildCache(),
-		depGraph:    NewDependencyGraph(),
-		bufferPool:  NewBufferPool(defaultBufferSize),
-		errors:      NewErrorCollector(),
 		force:       *forceMode,
 		target:      *target,
 		dryRun:      *dryRun,
 		stats:       *stats,
 		outputDir:   *out,
-		config:      cfg,
-	}
-
-	if *concurrency <= 0 {
-		*concurrency = runtime.NumCPU()
-	} else if *concurrency > maxWorkers {
-		*concurrency = maxWorkers
-		log.Printf("Concurency set to %d", concurrency)
-	}
-
-	fileInfoPath = filepath.Join(cfg.Directories.Meta, "build_file_info.json")
-	buildCachePath = filepath.Join(cfg.Directories.Meta, "build_cache.json")
-
-	entries, err := os.ReadDir(cfg.Directories.Web)
-	if err != nil {
-		fmt.Errorf("failed to load read web directory: %w", err)
-		return
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			toBuildDir = append(toBuildDir, filepath.Join(cfg.Directories.Web, entry.Name()))
-		}
+		config:      &cfg,
 	}
 
 	ctx.initialize()

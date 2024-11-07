@@ -7,8 +7,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"gogogo/modules/config"
 	"gogogo/modules/router"
@@ -33,6 +35,18 @@ type BuildContext struct {
 	dryRun      bool
 	stats       bool
 	outputDir   string
+	buildStats  *BuildStats
+}
+
+type BuildStats struct {
+	StartTime      time.Time
+	EndTime        time.Time
+	TotalFiles     int32
+	ProcessedFiles int32
+	SkippedFiles   int32
+	AliasedPaths   int
+	TotalSize      int64
+	MinifiedSize   int64
 }
 
 type MetaData struct {
@@ -41,18 +55,65 @@ type MetaData struct {
 
 func (ctx *BuildContext) initialize() error {
 	// Initialize components
+
+	ctx.buildStats = &BuildStats{
+		StartTime: time.Now(),
+	}
 	ctx.aliasMap = make(map[string]string)
 	ctx.usedAliases = make(map[string]string)
 
 	ctx.workerpool = NewWorkerPool(ctx.concurrency, ctx)
 	ctx.minifier = NewMinificationWorker()
+	ctx.fileCache = NewFileCache()
+	ctx.buildCache = NewBuildCache()
+	ctx.depGraph = NewDependencyGraph()
+	ctx.bufferPool = NewBufferPool(defaultBufferSize)
+	ctx.errors = NewErrorCollector()
+
+	if ctx.dryRun {
+		log.Println("DRY RUN - no files will be written")
+	}
+
+	if ctx.target != "" {
+		targetPath := filepath.Join(ctx.config.Directories.Web, ctx.target)
+		if _, err := os.Stat(targetPath); err != nil {
+			return fmt.Errorf("target directory not found: %s", targetPath)
+		}
+		// Override toBuildDir with just the target
+		toBuildDir = []string{targetPath}
+		log.Printf("Building target directory: %s", ctx.target)
+	} else {
+		entries, err := os.ReadDir(ctx.config.Directories.Web)
+		if err != nil {
+			log.Fatalf("failed to load read web directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				toBuildDir = append(toBuildDir, filepath.Join(ctx.config.Directories.Web, entry.Name()))
+			}
+		}
+	}
+
+	if ctx.outputDir == "" {
+		ctx.outputDir = ctx.config.Directories.Dist
+	}
+
+	if ctx.concurrency <= 0 {
+		ctx.concurrency = runtime.NumCPU()
+	} else if ctx.concurrency > maxWorkers {
+		ctx.concurrency = maxWorkers
+		log.Printf("Concurency set to %d", ctx.concurrency)
+	}
 
 	// Load caches concurrently
 	errs := make(chan error, 2)
 	go func() {
+		fileInfoPath = filepath.Join(ctx.config.Directories.Meta, "build_file_info.json")
 		errs <- ctx.fileCache.Load(fileInfoPath)
 	}()
 	go func() {
+		buildCachePath = filepath.Join(ctx.config.Directories.Meta, "build_cache.json")
 		errs <- ctx.buildCache.Load(buildCachePath)
 	}()
 
@@ -73,7 +134,7 @@ func (ctx *BuildContext) build() error {
 		filepath.Walk(dir,
 			func(_ string, info os.FileInfo, _ error) error {
 				if info != nil && !info.IsDir() {
-					atomic.AddInt32(&totalFiles, 1)
+					atomic.AddInt32(&ctx.buildStats.TotalFiles, 1)
 				}
 				return nil
 			})
@@ -86,23 +147,32 @@ func (ctx *BuildContext) build() error {
 		}
 	}
 
-	// Wait for completion
-	if err := ctx.workerpool.Wait(); err != nil {
-		return err
-	}
+	if !ctx.dryRun {
+		// Wait for completion
+		if err := ctx.workerpool.Wait(); err != nil {
+			return err
+		}
 
-	// Build router binary
-	if err := ctx.buildRouterBinary(); err != nil {
-		return err
-	}
+		// Build router binary
+		if err := ctx.buildRouterBinary(); err != nil {
+			return err
+		}
 
-	// Save caches
-	if err := ctx.saveAllCaches(); err != nil {
-		return err
+		// Save caches
+		if err := ctx.saveAllCaches(); err != nil {
+			return err
+		}
 	}
 
 	if ctx.errors.HasErrors() {
 		return ctx.errors.Error()
+	}
+
+	if ctx.stats {
+		ctx.buildStats.EndTime = time.Now()
+		ctx.buildStats.ProcessedFiles = processedFiles
+		ctx.buildStats.AliasedPaths = len(ctx.aliasMap)
+		ctx.printBuildStats()
 	}
 
 	return nil
@@ -197,7 +267,9 @@ func (ctx *BuildContext) processDirectory(dir string) error {
 
 		if info.IsDir() || shouldIgnore(dir, path) {
 			if info.IsDir() {
-				ctx.processAlias(path)
+				if err := ctx.processAlias(path); err != nil {
+					ctx.errors.Add(err)
+				}
 			}
 			return nil
 		}
@@ -209,15 +281,33 @@ func (ctx *BuildContext) processDirectory(dir string) error {
 		}
 
 		if ctx.shouldProcess(relPath, info) {
+			aliasedPath := ctx.getAliasedPath(relPath)
+
+			if ctx.dryRun {
+				log.Printf("Would build: %s -> %s", relPath, aliasedPath)
+				atomic.AddInt32(&ctx.buildStats.ProcessedFiles, 1)
+				return nil
+			}
+
+			// Track file sizes for stats if needed
+			if ctx.stats {
+				atomic.AddInt64(&ctx.buildStats.TotalSize, info.Size())
+			}
+
 			ctx.workerpool.Submit(WorkItem{
 				Path:        path,
 				RelPath:     relPath,
+				AliasedPath: aliasedPath,
 				Info:        info,
-				AliasedPath: ctx.getAliasedPath(relPath),
 			})
-			atomic.AddInt32(&processedFiles, 1)
+			atomic.AddInt32(&ctx.buildStats.ProcessedFiles, 1)
 
-			log.Printf("%d/%d %s", processedFiles, totalFiles, relPath)
+			if ctx.buildStats.ProcessedFiles%10 == 0 {
+				log.Printf("Progress: %d/%d files processed",
+					ctx.buildStats.ProcessedFiles, ctx.buildStats.TotalFiles)
+			}
+		} else {
+			atomic.AddInt32(&ctx.buildStats.SkippedFiles, 1)
 		}
 
 		return nil
@@ -272,4 +362,30 @@ func (ctx *BuildContext) buildRouterBinary() error {
 		filepath.Join(ctx.config.Directories.Meta, "router_binary.bin"),
 		buffer.Bytes(),
 	)
+}
+
+func (ctx *BuildContext) printBuildStats() {
+	duration := ctx.buildStats.EndTime.Sub(ctx.buildStats.StartTime)
+	filesPerSec := float64(ctx.buildStats.ProcessedFiles) / duration.Seconds()
+
+	fmt.Printf("\nBuild Statistics:\n")
+	fmt.Printf("================\n")
+	fmt.Printf("Duration: %v\n", duration)
+	fmt.Printf("Total Files: %d\n", ctx.buildStats.TotalFiles)
+	fmt.Printf("Processed: %d\n", ctx.buildStats.ProcessedFiles)
+	fmt.Printf("Skipped: %d\n", ctx.buildStats.SkippedFiles)
+	fmt.Printf("Aliased Paths: %d\n", ctx.buildStats.AliasedPaths)
+	fmt.Printf("Files/Second: %.2f\n", filesPerSec)
+
+	if ctx.buildStats.MinifiedSize > 0 {
+		reduction := (1 - float64(ctx.buildStats.MinifiedSize)/float64(ctx.buildStats.TotalSize)) * 100
+		fmt.Printf("Size Reduction: %.2f%%\n", reduction)
+	}
+
+	if ctx.target != "" {
+		fmt.Printf("Target Directory: %s\n", ctx.target)
+	}
+	if ctx.outputDir != "" {
+		fmt.Printf("Output Directory: %s\n", ctx.outputDir)
+	}
 }

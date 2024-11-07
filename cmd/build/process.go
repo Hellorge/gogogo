@@ -22,6 +22,15 @@ type ProcessResult struct {
 }
 
 func (w *Worker) processFile(item WorkItem) (ProcessResult, error) {
+	if w.ctx.dryRun {
+		return ProcessResult{
+			FileInfo: router.FileInfo{
+				ModTime:  item.Info.ModTime(),
+				DistPath: filepath.Join(w.ctx.config.Directories.Dist, item.AliasedPath),
+			},
+		}, nil
+	}
+
 	content, err := os.ReadFile(item.Path)
 	if err != nil {
 		return ProcessResult{}, fmt.Errorf("error reading file: %w", err)
@@ -85,7 +94,7 @@ func (w *Worker) processFile(item WorkItem) (ProcessResult, error) {
 	)
 
 	relDir := filepath.Dir(item.RelPath)
-	outPath := filepath.Join(w.ctx.config.Directories.Dist, relDir, fileName)
+	outPath := filepath.Join(w.ctx.outputDir, relDir, fileName)
 
 	if err := atomicWrite(outPath, minified); err != nil {
 		return ProcessResult{}, fmt.Errorf("error writing file: %w", err)

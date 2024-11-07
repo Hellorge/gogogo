@@ -78,16 +78,24 @@ func (w *Worker) process(item WorkItem) error {
 		return fmt.Errorf("error processing %s: %w", item.Path, err)
 	}
 
-	w.ctx.fileCache.Set(item.AliasedPath, result.FileInfo)
-	w.ctx.buildCache.Set(item.AliasedPath, BuildCacheEntry{
-		Content:  result.Content,
-		Hash:     result.Hash,
-		DistPath: result.FileInfo.DistPath,
-	})
+	if w.ctx.stats && !w.ctx.dryRun {
+		// Track minified size for stats
+		atomic.AddInt64(&w.ctx.buildStats.MinifiedSize, int64(len(result.Content)))
+	}
 
-	if len(result.Dependencies) > 0 {
-		for _, dep := range result.Dependencies {
-			w.ctx.depGraph.AddDependency(item.RelPath, dep)
+	if !w.ctx.dryRun {
+		// Only write files and update caches in non-dry-run mode
+		w.ctx.fileCache.Set(item.AliasedPath, result.FileInfo)
+		w.ctx.buildCache.Set(item.AliasedPath, BuildCacheEntry{
+			Content:  result.Content,
+			Hash:     result.Hash,
+			DistPath: result.FileInfo.DistPath,
+		})
+
+		if len(result.Dependencies) > 0 {
+			for _, dep := range result.Dependencies {
+				w.ctx.depGraph.AddDependency(item.RelPath, dep)
+			}
 		}
 	}
 
