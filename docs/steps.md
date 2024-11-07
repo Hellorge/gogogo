@@ -12,18 +12,10 @@ steps takes for this project:
 	- and etc...
 
 3. commands:
-	cd into cmd
-	start server = go run main.go
-		- '-prod' for production mode
-		- '-spa' for SPA mode
-		- '-metrics' for logging metrics data
-
-	build assets = go run build.go
-		- '-watch' for file watcher to build assets on change
-		- '-concurrency x' to change parallel building to no X
-		- use .buildignore file to ignore patters and files in build process
-
-	check metrics = go run stats.go
+	cd into project root
+	start server = go run ./cmd/main
+	build assets = go run ./cmd/build
+	check metrics = go run ./cmd/stats //broken as of now
 
 4. features:
 	- SPA and Traditional modes
@@ -32,25 +24,18 @@ steps takes for this project:
 	- Pre compile, minified file serving for production
 	- Dynamic cache size based on available memory
 	- Template caching
-	- Static file serving
-	- Thread safety in caching
-	- Variable cache life policy
 	- Benchmarks for native metrics overhead, test cases for high loads, high traffic, sustained high load, burst traffic
 	-
 
 +++
 - binary production files, and templating comtenting in build process
+- nested templates, partial templates
 - logger and profiler features
-- worker pool for request serving
 - Consider making it optional or implementing a more efficient, lock-free metrics collection mechanism.
-- multi-level cache (memory -> shared memory -> disk)
-- in server folder add config file for template selection, header imports, seo and content path aliases
 - handle multiple sites using '/server/{sitename}/home'
 - client side page caching based on client system specs
 - when building remove any cache corresponding to files that are built
 - client side background thread asset loading
-- nested templates, partial templates
-- LFU, Predictive-Gradual cache warming
 - Single-source Distributed serving capabilities
 - Js MayNeed dynamic module loading system, for known resource combinations, we can use HTTP/2 Server Push to send critical assets before the client requests them.
 <link rel="preload" href="/api/content/next-likely-page" as="fetch">

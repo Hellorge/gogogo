@@ -30,9 +30,15 @@ var (
 )
 
 func main() {
+	treeFlag := flag.Bool("tree", false, "Display directory structure with aliases")
 	watch := flag.Bool("watch", false, "Watch for file changes")
 	concurrency := flag.Int("concurrency", runtime.NumCPU(), "Number of concurrent workers")
 	verbose := flag.Bool("v", false, "Verbose output")
+	forceMode := flag.Bool("force", false, "Force build all files")
+	target := flag.String("target", "", "Build specific directory (relative to content dir)")
+	dryRun := flag.Bool("dry-run", false, "Show what would be built without actually building")
+	stats := flag.Bool("stats", false, "Show detailed build statistics")
+	out := flag.String("out", "", "Custom output directory (default: dist)")
 	flag.Parse()
 
 	// Initialize logger
@@ -41,11 +47,54 @@ func main() {
 		log.SetFlags(log.Ltime | log.Lmicroseconds)
 	}
 
-	// Initialize build context
-	ctx, err := initializeBuildContext(*concurrency)
+	cfg, err := config.LoadConfig("web/config.toml")
 	if err != nil {
-		log.Fatalf("Failed to initialize build context: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	if *out != "" {
+		cfg.Directories.Dist = *out
+	}
+
+	// Initialize build context
+	ctx := BuildContext{
+		concurrency: *concurrency,
+		fileCache:   NewFileCache(),
+		buildCache:  NewBuildCache(),
+		depGraph:    NewDependencyGraph(),
+		bufferPool:  NewBufferPool(defaultBufferSize),
+		errors:      NewErrorCollector(),
+		force:       *forceMode,
+		target:      *target,
+		dryRun:      *dryRun,
+		stats:       *stats,
+		outputDir:   *out,
+		config:      cfg,
+	}
+
+	if *concurrency <= 0 {
+		*concurrency = runtime.NumCPU()
+	} else if *concurrency > maxWorkers {
+		*concurrency = maxWorkers
+		log.Printf("Concurency set to %d", concurrency)
+	}
+
+	fileInfoPath = filepath.Join(cfg.Directories.Meta, "build_file_info.json")
+	buildCachePath = filepath.Join(cfg.Directories.Meta, "build_cache.json")
+
+	entries, err := os.ReadDir(cfg.Directories.Web)
+	if err != nil {
+		fmt.Errorf("failed to load read web directory: %w", err)
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			toBuildDir = append(toBuildDir, filepath.Join(cfg.Directories.Web, entry.Name()))
+		}
+	}
+
+	ctx.initialize()
 
 	// Run build or watch
 	if *watch {
@@ -59,47 +108,13 @@ func main() {
 		}
 		log.Printf("Build completed in %v", time.Since(buildStartTime))
 	}
-}
 
-func initializeBuildContext(concurrency int) (*BuildContext, error) {
-	if concurrency <= 0 {
-		concurrency = runtime.NumCPU()
-	} else if concurrency > maxWorkers {
-		concurrency = maxWorkers
-		log.Printf("Concurency set to %d", concurrency)
-	}
-
-	ctx := &BuildContext{
-		concurrency: concurrency,
-		fileCache:   NewFileCache(),
-		buildCache:  NewBuildCache(),
-		depGraph:    NewDependencyGraph(),
-		bufferPool:  NewBufferPool(defaultBufferSize),
-		errors:      NewErrorCollector(),
-	}
-
-	cfg, err := config.LoadConfig("web/config.toml")
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-	ctx.config = &cfg
-
-	fileInfoPath = filepath.Join(cfg.Directories.Meta, "build_file_info.json")
-	buildCachePath = filepath.Join(cfg.Directories.Meta, "build_cache.json")
-
-	entries, err := os.ReadDir(cfg.Directories.Web)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load read web directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			toBuildDir = append(toBuildDir, filepath.Join(cfg.Directories.Web, entry.Name()))
+	// Handle tree command
+	if *treeFlag {
+		treeCmd := NewTreeCommand()
+		if err := treeCmd.Execute(cfg.Directories.Web); err != nil {
+			log.Fatalf("Failed to display tree: %v", err)
 		}
+		return
 	}
-
-	ctx.initialize()
-
-	return ctx, nil
 }

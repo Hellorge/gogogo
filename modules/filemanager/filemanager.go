@@ -55,16 +55,6 @@ func New(fa *fileaccess.FileAccess, ca *cache.Cache, co *coalescer.Coalescer, cf
 	return fm
 }
 
-func (fm *FileManager) ExistsDevelopment(path string) bool {
-	_, err := fm.fileAccess.Stat(filepath.Join(fm.rootDir, path))
-	return err == nil
-}
-
-func (fm *FileManager) ExistsProduction(path string) bool {
-	_, ok := fm.router.Route(path)
-	return ok
-}
-
 func (fm *FileManager) getDevelopment(path string) ([]byte, error) {
 	return fm.fileAccess.Read(filepath.Join(fm.rootDir, path))
 }
@@ -106,4 +96,14 @@ func (fm *FileManager) OpenProduction(path string) (*os.File, error) {
 		return nil, ErrNotFound
 	}
 	return fm.fileAccess.Open(distPath)
+}
+
+func (fm *FileManager) ExistsDevelopment(path string) bool {
+	_, err := fm.fileAccess.Stat(filepath.Join(fm.rootDir, path))
+	return err == nil
+}
+
+func (fm *FileManager) ExistsProduction(path string) bool {
+	_, ok := fm.router.Route(path)
+	return ok
 }

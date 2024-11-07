@@ -12,6 +12,8 @@ import (
 
 	"gogogo/modules/config"
 	"gogogo/modules/router"
+
+	"github.com/BurntSushi/toml"
 )
 
 type BuildContext struct {
@@ -24,10 +26,24 @@ type BuildContext struct {
 	workerpool  *WorkerPool
 	minifier    *MinificationWorker
 	errors      *ErrorCollector
+	aliasMap    map[string]string
+	usedAliases map[string]string
+	force       bool
+	target      string
+	dryRun      bool
+	stats       bool
+	outputDir   string
+}
+
+type MetaData struct {
+	Alias string `toml:"alias"`
 }
 
 func (ctx *BuildContext) initialize() error {
 	// Initialize components
+	ctx.aliasMap = make(map[string]string)
+	ctx.usedAliases = make(map[string]string)
+
 	ctx.workerpool = NewWorkerPool(ctx.concurrency, ctx)
 	ctx.minifier = NewMinificationWorker()
 
@@ -109,6 +125,69 @@ func (ctx *BuildContext) saveAllCaches() error {
 	return nil
 }
 
+func (ctx *BuildContext) getAliasedPath(path string) string {
+	if path == "." || path == "" {
+		return path
+	}
+
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+
+	// Use the alias if it exists, otherwise use the original name
+	if alias, exists := ctx.aliasMap[path]; exists {
+		base = alias
+	}
+
+	parentPath := ctx.getAliasedPath(dir)
+	if parentPath == "." {
+		return base
+	}
+
+	return filepath.Join(parentPath, base)
+}
+
+func (ctx *BuildContext) processAlias(path string) error {
+	metaPath := filepath.Join(path, "meta.toml")
+	relPath, err := filepath.Rel(ctx.config.Directories.Web, path)
+	if err != nil {
+		return fmt.Errorf("error calculating relative path for %s: %w", path, err)
+	}
+
+	if _, err := os.Stat(metaPath); err == nil {
+		data, err := os.ReadFile(metaPath)
+		if err != nil {
+			return fmt.Errorf("error reading meta.toml at %s: %w", path, err)
+		}
+
+		meta := &MetaData{}
+		if err := toml.Unmarshal(data, meta); err != nil {
+			return fmt.Errorf("error parsing meta.toml at %s: %w", path, err)
+		}
+
+		if meta.Alias != "" {
+			if strings.ContainsAny(meta.Alias, "<>:\"\\|?*") {
+				return fmt.Errorf("invalid characters in alias for path %q: %q", relPath, meta.Alias)
+			}
+
+			if len(meta.Alias) > 100 {
+				return fmt.Errorf("alias too long for path %q: %q (max 100 characters)", relPath, meta.Alias)
+			}
+
+			if existing, exists := ctx.usedAliases[meta.Alias]; exists {
+				return fmt.Errorf("duplicate alias detected:\n"+
+					"  Alias: %s\n"+
+					"  Path: %s\n"+
+					"  Conflicts with: %s\n",
+					meta.Alias, relPath, existing)
+			}
+
+			ctx.aliasMap[relPath] = meta.Alias
+			ctx.usedAliases[meta.Alias] = relPath
+		}
+	}
+	return nil
+}
+
 func (ctx *BuildContext) processDirectory(dir string) error {
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -117,6 +196,9 @@ func (ctx *BuildContext) processDirectory(dir string) error {
 		}
 
 		if info.IsDir() || shouldIgnore(dir, path) {
+			if info.IsDir() {
+				ctx.processAlias(path)
+			}
 			return nil
 		}
 
@@ -128,15 +210,14 @@ func (ctx *BuildContext) processDirectory(dir string) error {
 
 		if ctx.shouldProcess(relPath, info) {
 			ctx.workerpool.Submit(WorkItem{
-				Path:    path,
-				RelPath: relPath,
-				Info:    info,
+				Path:        path,
+				RelPath:     relPath,
+				Info:        info,
+				AliasedPath: ctx.getAliasedPath(relPath),
 			})
 			atomic.AddInt32(&processedFiles, 1)
 
-			if processedFiles%10 == 0 {
-				log.Printf("Progress: %d/%d files processed", processedFiles, totalFiles)
-			}
+			log.Printf("%d/%d %s", processedFiles, totalFiles, relPath)
 		}
 
 		return nil
@@ -144,6 +225,10 @@ func (ctx *BuildContext) processDirectory(dir string) error {
 }
 
 func (ctx *BuildContext) shouldProcess(relPath string, info os.FileInfo) bool {
+	if ctx.force {
+		return true
+	}
+
 	fileInfo, exists := ctx.fileCache.Get(relPath)
 	if !exists {
 		return true

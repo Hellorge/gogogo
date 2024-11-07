@@ -135,9 +135,6 @@ func loadContent(fm *filemanager.FileManager, dir string, path string) *PageData
 
 func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	if len(path) <= 1 {
-		path = "home"
-	}
 
 	pc := loadContent(h.fm, h.contentPath, path)
 	if pc.err != nil {
@@ -189,9 +186,6 @@ func (h *WebHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	if len(path) <= 1 {
-		path = "home"
-	}
 
 	pc := loadContent(h.fm, h.contentPath, path)
 	if pc.err != nil {
@@ -263,9 +257,6 @@ func (h *StaticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[5:] // strip /api/
-	if len(path) <= 1 {
-		path = "home"
-	}
 
 	content, err := h.fm.GetContent(filepath.Join(h.contentPath, path, contentFile))
 	if err != nil {

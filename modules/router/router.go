@@ -13,9 +13,10 @@ type Router struct {
 }
 
 type FileInfo struct {
-	ModTime   time.Time `json:"ModTime"`
-	DistPath  string    `json:"DistPath"`
-	DependsOn []string  `json:"DependsOn"`
+	ModTime     time.Time `json:"ModTime"`
+	DistPath    string    `json:"DistPath"`
+	DependsOn   []string  `json:"DependsOn"`
+	AliasedPath string    `json:"AliasedPath"`
 }
 
 type RadixNode struct {

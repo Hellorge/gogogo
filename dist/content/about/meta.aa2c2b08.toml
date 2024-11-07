@@ -1,6 +1,6 @@
 # General settings
 # template = "article"
-
+alias = "/"
 # Resource handling
 inlineStyle = true
 inlineScript = false

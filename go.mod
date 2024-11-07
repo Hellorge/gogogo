@@ -7,6 +7,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/evanw/esbuild v0.23.1 // indirect
+	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gdamore/tcell/v2 v2.7.4 // indirect
@@ -14,6 +15,8 @@ require (
 	github.com/guptarohit/asciigraph v0.7.2 // indirect
 	github.com/jroimartin/gocui v0.5.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/nsf/termbox-go v1.1.1 // indirect

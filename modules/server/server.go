@@ -115,21 +115,21 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-type tcpKeepAliveListener struct {
-	*net.TCPListener
-	keepAlivePeriod time.Duration
-}
+// type tcpKeepAliveListener struct {
+// 	*net.TCPListener
+// 	keepAlivePeriod time.Duration
+// }
 
-func (ln *tcpKeepAliveListener) Accept() (net.Conn, error) {
-	tc, err := ln.AcceptTCP()
-	if err != nil {
-		return nil, err
-	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(ln.keepAlivePeriod)
-	tc.SetNoDelay(true)
-	return tc, nil
-}
+// func (ln *tcpKeepAliveListener) Accept() (net.Conn, error) {
+// 	tc, err := ln.AcceptTCP()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	tc.SetKeepAlive(true)
+// 	tc.SetKeepAlivePeriod(ln.keepAlivePeriod)
+// 	tc.SetNoDelay(true)
+// 	return tc, nil
+// }
 
 // func (ln *tcpKeepAliveListener) Accept() (net.Conn, error) {
 //     tc, err := ln.AcceptTCP()
