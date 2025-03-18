@@ -5,7 +5,10 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"html/template"
+
 	"fmt"
+	"gogogo/modules/metaparser"
 	"gogogo/modules/router"
 	"os"
 	"path/filepath"
@@ -50,6 +53,10 @@ func (w *Worker) processFile(item WorkItem) (ProcessResult, error) {
 			Hash:         entry.Hash,
 			Dependencies: findDependencies(content),
 		}, nil
+	}
+
+	if filepath.Base(item.Path) == "content.html" {
+		return w.processContentHTML(item, content, hashString)
 	}
 
 	ext := filepath.Ext(item.Path)
@@ -137,4 +144,143 @@ func extractDependency(line string) string {
 		return line
 	}
 	return ""
+}
+
+// processContentHTML handles content.html files by pre-rendering complete HTML pages
+func (w *Worker) processContentHTML(item WorkItem, content []byte, hashString string) (ProcessResult, error) {
+	// Determine relative page path for URL formation
+	contentRoot := filepath.Join(w.ctx.config.Directories.Web, w.ctx.config.Directories.Content)
+	parentDir := filepath.Dir(item.Path)
+	pagePath, err := filepath.Rel(contentRoot, parentDir)
+	if err != nil {
+		return ProcessResult{}, fmt.Errorf("error getting relative path: %w", err)
+	}
+
+	// Load meta, style, and script files
+	metaPath := filepath.Join(parentDir, "meta.toml")
+	stylePath := filepath.Join(parentDir, "style.css")
+	scriptPath := filepath.Join(parentDir, "script.js")
+
+	// Initialize page data
+	pd := struct {
+		content      []byte
+		style        []byte
+		script       []byte
+		styleExists  string
+		scriptExists string
+		meta         *metaparser.MetaData
+		err          error
+	}{
+		content: content,
+		meta:    &metaparser.MetaData{},
+	}
+
+	// Load meta.toml
+	metaContent, err := os.ReadFile(metaPath)
+	if err == nil {
+		if meta, err := metaparser.ParseMetaData(metaContent); err == nil {
+			pd.meta = meta
+		}
+	}
+
+	// Process style
+	if pd.meta.InlineStyle {
+		style, err := os.ReadFile(stylePath)
+		if err == nil {
+			pd.style = style
+		}
+	} else if _, err := os.Stat(stylePath); err == nil {
+		// Create style URL relative to static path
+		pd.styleExists = fmt.Sprintf("/static/%s/style.css", pagePath)
+	}
+
+	// Process script
+	if pd.meta.InlineScript {
+		script, err := os.ReadFile(scriptPath)
+		if err == nil {
+			pd.script = script
+		}
+	} else if _, err := os.Stat(scriptPath); err == nil {
+		// Create script URL relative to static path
+		pd.scriptExists = fmt.Sprintf("/static/%s/script.js", pagePath)
+	}
+
+	// Load main template
+	templatePath := filepath.Join(
+		w.ctx.config.Directories.Web,
+		w.ctx.config.Directories.Templates,
+		w.ctx.config.Templates.Main,
+		"index.html",
+	)
+
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		return ProcessResult{}, fmt.Errorf("error loading template: %w", err)
+	}
+
+	// Parse template
+	tmpl, err := template.New(filepath.Base(templatePath)).Parse(string(templateContent))
+	if err != nil {
+		return ProcessResult{}, fmt.Errorf("error parsing template: %w", err)
+	}
+
+	// Prepare template data struct
+	data := struct {
+		Content   template.HTML
+		Style     template.CSS
+		Script    template.JS
+		StyleURL  string
+		ScriptURL string
+		Meta      *metaparser.MetaData
+		IsSPAMode bool
+	}{
+		Content:   template.HTML(pd.content),
+		Style:     template.CSS(pd.style),
+		Script:    template.JS(pd.script),
+		StyleURL:  pd.styleExists,
+		ScriptURL: pd.scriptExists,
+		Meta:      pd.meta,
+		IsSPAMode: false, // Always false for pre-rendered HTML
+	}
+
+	// Execute template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return ProcessResult{}, fmt.Errorf("error executing template: %w", err)
+	}
+
+	// Minify the resulting HTML
+	renderedHTML := buf.Bytes()
+	minified, err := w.ctx.minifier.Bytes("text/html", renderedHTML)
+	if err != nil {
+		return ProcessResult{}, fmt.Errorf("error minifying HTML: %w", err)
+	}
+
+	ext := filepath.Ext(item.Path)
+	minifiedHash := md5.Sum(minified)
+	fileName := fmt.Sprintf("%s.%s%s",
+		strings.TrimSuffix(filepath.Base(item.Path), ext),
+		hex.EncodeToString(minifiedHash[:])[:8],
+		ext,
+	)
+
+	relDir := filepath.Dir(item.RelPath)
+	outPath := filepath.Join(w.ctx.outputDir, relDir, fileName)
+
+	// Write the pre-rendered HTML file
+	if err := atomicWrite(outPath, minified); err != nil {
+		return ProcessResult{}, fmt.Errorf("error writing HTML file: %w", err)
+	}
+
+	// Regular return for the router
+	return ProcessResult{
+		FileInfo: router.FileInfo{
+			ModTime:   item.Info.ModTime(),
+			DistPath:  outPath,
+			DependsOn: []string{}, // Pre-rendered HTML doesn't need dependencies
+		},
+		Content:      minified,
+		Hash:         hashString,
+		Dependencies: []string{},
+	}, nil
 }
